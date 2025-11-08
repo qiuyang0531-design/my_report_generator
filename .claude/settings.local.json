@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(conda create:*)",
+      "Bash(conda search:*)",
+      "Bash(conda activate:*)",
+      "Bash(./env/python.exe:*)",
+      "Bash(conda list:*)",
+      "Bash(conda install:*)",
+      "Bash(conda config:*)",
+      "Bash(rm:*)",
+      "Bash(python:*)",
+      "Bash(env/Scripts/python.exe:*)",
+      "Bash(dir:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

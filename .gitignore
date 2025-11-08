@@ -1,0 +1,37 @@
+# Virtual Environment
+venv/
+env/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Windows files
+Thumbs.db
+.DS_Store
+
+# IDE files
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Office temp files
+~$*.docx
+
+# Test output
+test_report.docx
+碳盘查报告*.docx
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# System files
+nul
