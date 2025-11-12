@@ -22,6 +22,8 @@ Thumbs.db
 # Office temp files
 ~$*.docx
 ~$*.xlsx
+.~*.docx
+.~*.xlsx
 
 # Excel files (except the test_data.xlsx example)
 *.xlsx
