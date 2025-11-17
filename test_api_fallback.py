@@ -35,7 +35,7 @@ try:
     # 检查响应
     if response.status_code == 200:
         # 保存生成的文档
-        output_file = f'report_测试公司_安全网测试.docx'
+        output_file = 'carbon_report_v1.docx'
         with open(output_file, 'wb') as f:
             f.write(response.content)
         print(f"成功生成文档: {output_file}")

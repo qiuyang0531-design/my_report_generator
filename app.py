@@ -82,7 +82,7 @@ def generate_report():
             )
             
             # 生成报告文件路径
-            report_filename = f"碳盘查报告_{timestamp}.docx"
+            report_filename = "carbon_report_v1.docx"
             report_filepath = os.path.join(app.config['UPLOAD_FOLDER'], report_filename)
             
             # 写入报告数据

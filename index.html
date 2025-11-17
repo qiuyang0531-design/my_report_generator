@@ -81,7 +81,7 @@
                     a.style.display = 'none';
                     a.href = url;
                     // 从响应头获取文件名，或使用默认
-                    a.download = `report_${companyInput.value}.docx`;
+                    a.download = `carbon_report_v1.docx`;
                     document.body.appendChild(a);
                     a.click();
                     window.URL.revokeObjectURL(url);

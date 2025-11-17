@@ -86,7 +86,7 @@ def generate_report():
 
         # --- 6. 准备并返回 Word 文件 ---
         # 我们把 Word 文档也保存在临时目录
-        output_filename = f"report_{company_name}_{report_year}.docx"
+        output_filename = "carbon_report_v1.docx"
         temp_word_path = os.path.join(temp_dir, output_filename)
         writer.save(temp_word_path)
         print(f"临时报告已生成: {temp_word_path}")
