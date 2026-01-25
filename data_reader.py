@@ -2,7 +2,16 @@ import openpyxl
 import csv
 import os
 
-class ExcelDataReader: 
+class ExcelDataReader:
+    def _safe_float(self, value):
+        """安全地将值转换为浮点数"""
+        try:
+            if value is None:
+                return 0.0
+            return float(value)
+        except (ValueError, TypeError):
+            return 0.0
+
     def __init__(self, filepath): 
         """ 
         初始化时，加载 Excel 工作簿。 
@@ -389,8 +398,9 @@ class ExcelDataReader:
                 print(f"成功从CSV读取 {len(data)} 个字段 (编码: {encoding})")
 
                 # 计算scope_3_emissions总和（如果CSV中没有）
+                # 保持为 float 类型，不转换为字符串
                 if 'scope_3_emissions' not in data:
-                    scope3_total = 0
+                    scope3_total = 0.0
                     for i in range(1, 16):
                         key = f'scope_3_category_{i}_emissions'
                         if key in data and data[key]:
@@ -398,7 +408,7 @@ class ExcelDataReader:
                                 scope3_total += float(data[key])
                             except ValueError:
                                 pass
-                    data['scope_3_emissions'] = str(round(scope3_total, 6))
+                    data['scope_3_emissions'] = round(scope3_total, 6)
                     print(f"计算得出 scope_3_emissions: {data['scope_3_emissions']}")
 
                 return data
@@ -718,7 +728,7 @@ class ExcelDataReader:
                     if category in str(key):
                         items.append({
                             'name': display_name,
-                            'emission': '0.00',
+                            'emission': 0.0,
                             'note': value
                         })
                         break
@@ -727,20 +737,20 @@ class ExcelDataReader:
                 if '外购电力' in str(key) or '外购热力' in str(key):
                     items.append({
                         'name': value,  # 使用CSV中的值作为排放源名称
-                        'emission': '0.00',
+                        'emission': 0.0,
                         'note': '外购能源'
                     })
                 elif '上游' in str(key) or '产生的排放' in str(key):
                     # 上游排放源
                     items.append({
                         'name': value,
-                        'emission': '0.00',
+                        'emission': 0.0,
                         'note': '上游排放'
                     })
                 elif any(x in str(key) for x in [' purchased_goods', 'category_1', 'category_2']):
                     items.append({
                         'name': value,
-                        'emission': '0.00',
+                        'emission': 0.0,
                         'note': '商品和服务'
                     })
 
@@ -772,24 +782,31 @@ class ExcelDataReader:
         data = {}
         data.update(default_values)
 
-        # ========== 优先尝试从CSV文件读取所有数据 ==========
-        import os
-        csv_path = '减排行动统计.csv'
-        if os.path.exists(csv_path):
+        # ========== 跳过CSV文件读取，直接从Excel读取所有数据 ==========
+        # 注释掉CSV处理逻辑，改为只从Excel读取
+        # import os
+        # csv_path = '减排行动统计.csv'
+        # if os.path.exists(csv_path):
+
+        # 为了保持原有逻辑结构，这里直接设置csv_exists为False
+        csv_exists = False
+
+        if csv_exists:  # 永远为False，跳过CSV处理
             csv_data = self.read_emission_data_csv(csv_path)
             if csv_data:
                 data.update(csv_data)
                 print(f"从CSV文件成功读取 {len(csv_data)} 个变量")
 
-                # ========== 格式化数字：保留两位小数，添加千分位分隔符 ==========
-                def format_number(value):
-                    """格式化数字：保留两位小数，添加千分位分隔符"""
+                # ========== 将排放数据转换为 float 类型（保持数据层纯净）==========
+                # 格式化（加逗号、保留小数）是展示层（View Layer/Writer）的事
+                def to_float(value, default=0.0):
+                    """将值转换为 float 类型，失败则返回默认值"""
                     try:
-                        return f"{float(value):,.2f}"
+                        return float(value)
                     except (ValueError, TypeError):
-                        return "0.00"
+                        return default
 
-                # 格式化所有排放数据（原始键名，用于模板渲染）
+                # 确保所有排放数据为 float 类型
                 emission_keys = [
                     'scope_1_emissions',
                     'scope_2_location_based_emissions',
@@ -808,7 +825,7 @@ class ExcelDataReader:
                 ]
                 for key in emission_keys:
                     if key in data:
-                        data[key] = format_number(data[key])
+                        data[key] = to_float(data[key])
 
                 # ========== 构建表格数据列表（使用按区域解析的方法）==========
                 section_data = self._parse_csv_sections(csv_path)
@@ -820,16 +837,16 @@ class ExcelDataReader:
                 # 构建最终的scope2_3_items列表
                 # 1. 首先添加范围二的总量数据（如果有）
                 scope2_3_items = []
-                scope2_location = data.get('scope_2_location_based_emissions', '0.00')
-                scope2_market = data.get('scope_2_market_based_emissions', '0.00')
+                scope2_location = data.get('scope_2_location_based_emissions', 0.0)
+                scope2_market = data.get('scope_2_market_based_emissions', 0.0)
 
-                if scope2_location != '0.00':
+                if scope2_location > 0:
                     scope2_3_items.append({
                         'name': '范围二：能源间接温室气体排放（基于位置）',
                         'emission': scope2_location,
                         'note': '外购电力和热力'
                     })
-                if scope2_market != '0.00':
+                if scope2_market > 0:
                     scope2_3_items.append({
                         'name': '范围二：能源间接温室气体排放（基于市场）',
                         'emission': scope2_market,
@@ -851,8 +868,8 @@ class ExcelDataReader:
                 ]
 
                 for name, emission_key, note in scope3_total_items:
-                    emission_value = data.get(emission_key, '0.00')
-                    if emission_value != '0.00':
+                    emission_value = data.get(emission_key, 0.0)
+                    if emission_value > 0:
                         scope2_3_items.append({
                             'name': name,
                             'emission': emission_value,
@@ -881,18 +898,27 @@ class ExcelDataReader:
                     if csv_key in data:
                         data[ai_key] = data[csv_key]
 
-                # 计算总排放量（用于AI摘要）
+                # ========== 添加布尔值标记系统（Flags）==========
+                # 这是为了让后续的程序能看懂"是否需要生成这一节"
+                data['flags'] = {
+                    'has_scope_1': data.get('scope_1_emissions', 0.0) > 0,
+                    'has_scope_2_location': data.get('scope_2_location_based_emissions', 0.0) > 0,
+                    'has_scope_2_market': data.get('scope_2_market_based_emissions', 0.0) > 0,
+                    'has_scope_3': data.get('scope_3_emissions', 0.0) > 0,
+                }
+
+                # 计算总排放量（用于AI摘要）- 保持为 float 类型
                 try:
-                    s1 = float(data.get('scope_1_emissions', 0))
-                    s2_loc = float(data.get('scope_2_location_based_emissions', 0))
-                    s3 = float(data.get('scope_3_emissions', 0))
+                    s1 = data.get('scope_1_emissions', 0.0)
+                    s2_loc = data.get('scope_2_location_based_emissions', 0.0)
+                    s3 = data.get('scope_3_emissions', 0.0)
                     total_loc = s1 + s2_loc + s3
 
-                    s2_mkt = float(data.get('scope_2_market_based_emissions', 0))
+                    s2_mkt = data.get('scope_2_market_based_emissions', 0.0)
                     total_mkt = s1 + s2_mkt + s3
 
-                    data['total_emission_location'] = format_number(total_loc)
-                    data['total_emission_market'] = format_number(total_mkt)
+                    data['total_emission_location'] = total_loc
+                    data['total_emission_market'] = total_mkt
 
                     # 提取年份
                     period = data.get('reporting_period', '')
@@ -900,9 +926,179 @@ class ExcelDataReader:
                     year_match = re.search(r'(\d{4})', str(period))
                     data['report_year'] = year_match.group(1) if year_match else '2024'
                 except (ValueError, TypeError):
-                    data['total_emission_location'] = "0.00"
-                    data['total_emission_market'] = "0.00"
+                    data['total_emission_location'] = 0.0
+                    data['total_emission_market'] = 0.0
                     data['report_year'] = '2024'
+
+                # ========== 从温室气体盘查表提取scope2_items（两行：基于位置和基于市场）==========
+                # 和scope3_items（范围三详细排放源）
+                if self.workbook and self.file_type == 'excel':
+                    import openpyxl
+                    import re
+
+                    # 查找温室气体盘查表
+                    pandata_sheet = None
+                    for sheet in self.workbook.worksheets:
+                        if '盘查表' in str(sheet.title):
+                            pandata_sheet = sheet
+                            break
+
+                    if pandata_sheet:
+                        print(f"从温室气体盘查表提取范围二和范围三数据")
+
+                        # ========== 提取scope2_items（两行：基于位置和基于市场）==========
+                        scope2_items = []
+                        location_total = None
+                        market_total = None
+                        total_keywords = ['汇总', '总计', 'Total', 'TOTAL']
+
+                        for row_idx, row in enumerate(pandata_sheet.iter_rows(min_row=1, values_only=True), start=1):
+                            first_col = str(row[0]).strip() if row[0] else ''
+                            second_col = str(row[1]).strip() if len(row) > 1 else ''
+                            fourth_col = str(row[4]).strip() if len(row) > 4 else ''
+
+                            is_total_row = any(keyword in first_col or first_col == keyword for keyword in total_keywords)
+                            has_electricity = '外购' in second_col or '电力' in second_col
+
+                            if is_total_row and has_electricity:
+                                is_location = '位置' in fourth_col or 'Location' in fourth_col
+                                is_market = '市场' in fourth_col or 'Market' in fourth_col
+
+                                if is_location:
+                                    location_total = row
+                                elif is_market:
+                                    market_total = row
+
+                        # 构建scope2_items
+                        if location_total:
+                            total = self._safe_float(location_total[2]) if len(location_total) > 2 else 0
+                            co2 = self._safe_float(location_total[3]) if len(location_total) > 3 else total
+                            total_formatted = f"{total:,.2f}" if total > 0 else "0.00"
+                            co2_formatted = f"{co2:,.2f}" if co2 > 0 else "0.00"
+                            scope2_items.append({
+                                'number': '2.1',
+                                'emission_source': '外购电力（基于位置）',
+                                'total_green_house_gas_emissions': total_formatted,
+                                'CO2_emissions': co2_formatted,
+                                'CH4_emissions': '0.00',
+                                'N2O_emissions': '0.00',
+                                'HFCs_emissions': '0.00',
+                                'PFCs_emissions': '0.00',
+                                'SFs_emissions': '0.00',
+                                'NF3_emissions': '0.00'
+                            })
+
+                        if market_total:
+                            total = self._safe_float(market_total[2]) if len(market_total) > 2 else 0
+                            co2 = self._safe_float(market_total[3]) if len(market_total) > 3 else total
+                            total_formatted = f"{total:,.2f}" if total > 0 else "0.00"
+                            co2_formatted = f"{co2:,.2f}" if co2 > 0 else "0.00"
+                            scope2_items.append({
+                                'number': '2.2',
+                                'emission_source': '外购电力（基于市场）',
+                                'total_green_house_gas_emissions': total_formatted,
+                                'CO2_emissions': co2_formatted,
+                                'CH4_emissions': '0.00',
+                                'N2O_emissions': '0.00',
+                                'HFCs_emissions': '0.00',
+                                'PFCs_emissions': '0.00',
+                                'SFs_emissions': '0.00',
+                                'NF3_emissions': '0.00'
+                            })
+
+                        data['scope2_items'] = scope2_items
+                        print(f"提取到范围二排放明细: {len(scope2_items)} 行")
+
+                        # ========== 提取scope3_items（范围三详细排放源）==========
+                        category_names = {
+                            '类别1': '外购商品和服务上游排放',
+                            '类别2': '资本货物上游排放',
+                            '类别3': '燃料和能源相关活动未包含在范围一和范围二中的上游排放',
+                            '类别4': '上游运输和配送',
+                            '类别5': '运营中产生的废弃物',
+                            '类别6': '员工商务旅行',
+                            '类别7': '员工通勤',
+                            '类别8': '上游租赁资产',
+                            '类别9': '下游运输和配送',
+                            '类别10': '销售产品的加工',
+                            '类别11': '销售产品的使用',
+                            '类别12': '售出产品的加工',
+                            '类别13': '下游租赁资产',
+                            '类别14': '特许经营',
+                            '类别15': '投资'
+                        }
+
+                        category_detail_rows = {}
+                        for row_idx, row in enumerate(pandata_sheet.iter_rows(min_row=1, values_only=True), start=1):
+                            row_vals = [str(v) if v is not None else '' for v in row[:12]]
+
+                            if row_vals[0] and row_vals[0].isdigit():
+                                if len(row_vals) > 4 and '范围三' in row_vals[4] and '类别' in row_vals[4]:
+                                    category_match = re.search(r'类别\s*(\d+)', row_vals[4])
+                                    if category_match:
+                                        category_num = int(category_match.group(1))
+                                        if category_num not in category_detail_rows:
+                                            category_detail_rows[category_num] = []
+                                        category_detail_rows[category_num].append({'row_idx': row_idx, 'data': row})
+
+                        # 按类别分组存储范围三详细排放源
+                        # 模板期望的数据格式：scope3_category1, scope3_category2, ..., scope3_category15
+                        total_scope3_items = 0
+                        for category_num in sorted(category_detail_rows.keys()):
+                            detail_rows = category_detail_rows[category_num]
+                            category_key = f'类别{category_num}'
+                            category_var_name = f'scope3_category{category_num}'
+
+                            category_items = []
+                            sub_num = 0
+                            for row_info in detail_rows:
+                                row = row_info['data']
+                                row_vals = [str(v) if v is not None else '' for v in row[:12]]
+
+                                emission_source_name = row_vals[2]
+                                activity_data = self._safe_float(row[5])
+                                emission_factor = self._safe_float(row[7])
+                                factor_unit = row_vals[8]
+
+                                factor_in_tons = emission_factor
+                                if 'kgCO2' in factor_unit:
+                                    factor_in_tons = emission_factor / 1000
+                                elif 'kg CO2' in factor_unit:
+                                    factor_in_tons = emission_factor / 1000
+
+                                calculated_emission = activity_data * factor_in_tons
+
+                                if calculated_emission > 0.01:
+                                    sub_num += 1
+                                    total_formatted = f"{calculated_emission:,.2f}"
+                                    co2_formatted = f"{calculated_emission:,.2f}"
+
+                                    category_items.append({
+                                        'number': f'3.{category_num}.{sub_num}',
+                                        'emission_source': emission_source_name,
+                                        'total_green_house_gas_emissions': total_formatted,
+                                        'CO2_emissions': co2_formatted,
+                                        'CH4_emissions': '0.00',
+                                        'N2O_emissions': '0.00',
+                                        'HFCs_emissions': '0.00',
+                                        'PFCs_emissions': '0.00',
+                                        'SFs_emissions': '0.00',
+                                        'NF3_emissions': '0.00'
+                                    })
+
+                            # 将类别数据存储到对应的变量中
+                            data[category_var_name] = category_items
+                            total_scope3_items += len(category_items)
+                            print(f"  提取{category_var_name}: {len(category_items)} 行")
+
+                        # 同时保留scope3_items用于兼容
+                        data['scope3_items'] = []
+                        for cat_num in range(1, 16):
+                            cat_var = f'scope3_category{cat_num}'
+                            if cat_var in data:
+                                data['scope3_items'].extend(data[cat_var])
+
+                        print(f"提取到范围三详细排放明细总计: {total_scope3_items} 行")
 
                 return data
 
@@ -918,6 +1114,173 @@ class ExcelDataReader:
         # 处理Excel文件（温室气体排放数据）
         if not self.workbook or self.file_type != 'excel':
             return data
+
+        # ========== 从温室气体盘查表提取scope2_items和scope3_items ==========
+        import openpyxl
+        import re
+
+        # 查找温室气体盘查表
+        pandata_sheet = None
+        for sheet in self.workbook.worksheets:
+            if '盘查表' in str(sheet.title):
+                pandata_sheet = sheet
+                break
+
+        if pandata_sheet:
+            print(f"从温室气体盘查表提取范围二和范围三数据")
+
+            # ========== 提取scope2_items（两行：基于位置和基于市场）==========
+            scope2_items = []
+            location_total = None
+            market_total = None
+            total_keywords = ['汇总', '总计', 'Total', 'TOTAL']
+
+            for row_idx, row in enumerate(pandata_sheet.iter_rows(min_row=1, values_only=True), start=1):
+                first_col = str(row[0]).strip() if row[0] else ''
+                second_col = str(row[1]).strip() if len(row) > 1 else ''
+                fourth_col = str(row[4]).strip() if len(row) > 4 else ''
+
+                is_total_row = any(keyword in first_col or first_col == keyword for keyword in total_keywords)
+                has_electricity = '外购' in second_col or '电力' in second_col
+
+                if is_total_row and has_electricity:
+                    is_location = '位置' in fourth_col or 'Location' in fourth_col
+                    is_market = '市场' in fourth_col or 'Market' in fourth_col
+
+                    if is_location:
+                        location_total = row
+                    elif is_market:
+                        market_total = row
+
+            # 构建scope2_items
+            if location_total:
+                total = self._safe_float(location_total[2]) if len(location_total) > 2 else 0
+                co2 = self._safe_float(location_total[3]) if len(location_total) > 3 else total
+                total_formatted = f"{total:,.2f}" if total > 0 else "0.00"
+                co2_formatted = f"{co2:,.2f}" if co2 > 0 else "0.00"
+                scope2_items.append({
+                    'number': '2.1',
+                    'emission_source': '外购电力（基于位置）',
+                    'total_green_house_gas_emissions': total_formatted,
+                    'CO2_emissions': co2_formatted,
+                    'CH4_emissions': '0.00',
+                    'N2O_emissions': '0.00',
+                    'HFCs_emissions': '0.00',
+                    'PFCs_emissions': '0.00',
+                    'SFs_emissions': '0.00',
+                    'NF3_emissions': '0.00'
+                })
+
+            if market_total:
+                total = self._safe_float(market_total[2]) if len(market_total) > 2 else 0
+                co2 = self._safe_float(market_total[3]) if len(market_total) > 3 else total
+                total_formatted = f"{total:,.2f}" if total > 0 else "0.00"
+                co2_formatted = f"{co2:,.2f}" if co2 > 0 else "0.00"
+                scope2_items.append({
+                    'number': '2.2',
+                    'emission_source': '外购电力（基于市场）',
+                    'total_green_house_gas_emissions': total_formatted,
+                    'CO2_emissions': co2_formatted,
+                    'CH4_emissions': '0.00',
+                    'N2O_emissions': '0.00',
+                    'HFCs_emissions': '0.00',
+                    'PFCs_emissions': '0.00',
+                    'SFs_emissions': '0.00',
+                    'NF3_emissions': '0.00'
+                })
+
+            data['scope2_items'] = scope2_items
+            print(f"提取到范围二排放明细: {len(scope2_items)} 行")
+
+            # ========== 提取scope3_items（范围三详细排放源，按类别分组）==========
+            category_names = {
+                '类别1': '外购商品和服务上游排放',
+                '类别2': '资本货物上游排放',
+                '类别3': '燃料和能源相关活动未包含在范围一和范围二中的上游排放',
+                '类别4': '上游运输和配送',
+                '类别5': '运营中产生的废弃物',
+                '类别6': '员工商务旅行',
+                '类别7': '员工通勤',
+                '类别8': '上游租赁资产',
+                '类别9': '下游运输和配送',
+                '类别10': '销售产品的加工',
+                '类别11': '销售产品的使用',
+                '类别12': '售出产品的加工',
+                '类别13': '下游租赁资产',
+                '类别14': '特许经营',
+                '类别15': '投资'
+            }
+
+            category_detail_rows = {}
+            for row_idx, row in enumerate(pandata_sheet.iter_rows(min_row=1, values_only=True), start=1):
+                row_vals = [str(v) if v is not None else '' for v in row[:12]]
+
+                if row_vals[0] and row_vals[0].isdigit():
+                    if len(row_vals) > 4 and '范围三' in row_vals[4] and '类别' in row_vals[4]:
+                        category_match = re.search(r'类别\s*(\d+)', row_vals[4])
+                        if category_match:
+                            category_num = int(category_match.group(1))
+                            if category_num not in category_detail_rows:
+                                category_detail_rows[category_num] = []
+                            category_detail_rows[category_num].append({'row_idx': row_idx, 'data': row})
+
+            # 按类别分组存储
+            total_scope3_items = 0
+            for category_num in sorted(category_detail_rows.keys()):
+                detail_rows = category_detail_rows[category_num]
+                category_var_name = f'scope3_category{category_num}'
+
+                category_items = []
+                sub_num = 0
+                for row_info in detail_rows:
+                    row = row_info['data']
+                    row_vals = [str(v) if v is not None else '' for v in row[:12]]
+
+                    emission_source_name = row_vals[2]
+                    activity_data = self._safe_float(row[5])
+                    emission_factor = self._safe_float(row[7])
+                    factor_unit = row_vals[8]
+
+                    factor_in_tons = emission_factor
+                    if 'kgCO2' in factor_unit:
+                        factor_in_tons = emission_factor / 1000
+                    elif 'kg CO2' in factor_unit:
+                        factor_in_tons = emission_factor / 1000
+
+                    calculated_emission = activity_data * factor_in_tons
+
+                    if calculated_emission > 0.01:
+                        sub_num += 1
+                        total_formatted = f"{calculated_emission:,.2f}"
+                        co2_formatted = f"{calculated_emission:,.2f}"
+
+                        category_items.append({
+                            'number': f'3.{category_num}.{sub_num}',
+                            'emission_source': emission_source_name,
+                            'total_green_house_gas_emissions': total_formatted,
+                            'CO2_emissions': co2_formatted,
+                            'CH4_emissions': '0.00',
+                            'N2O_emissions': '0.00',
+                            'HFCs_emissions': '0.00',
+                            'PFCs_emissions': '0.00',
+                            'SFs_emissions': '0.00',
+                            'NF3_emissions': '0.00'
+                        })
+
+                # 将类别数据存储到对应的变量中
+                data[category_var_name] = category_items
+                total_scope3_items += len(category_items)
+                if category_items:
+                    print(f"  提取{category_var_name}: {len(category_items)} 行")
+
+            # 同时保留scope3_items用于兼容
+            data['scope3_items'] = []
+            for cat_num in range(1, 16):
+                cat_var = f'scope3_category{cat_num}'
+                if cat_var in data:
+                    data['scope3_items'].extend(data[cat_var])
+
+            print(f"提取到范围三详细排放明细总计: {total_scope3_items} 行")
 
         # 尝试多个可能的工作表名称
         main_sheet_candidates = ['温室气体盘查清册', '温室气体盘查清册 (2)']
@@ -1105,18 +1468,16 @@ class ExcelDataReader:
         except Exception as e:
             print(f"获取总排放量时出错: {e}")
         
-        # 将所有数据打包成一个标准字典 
-        data = { 
-            'company_name': company_name, 
-            'report_year': report_year, 
-            'scope_1': scope_1,  # 范围一排放量
-            'scope_2_location': scope_2_location,  # 范围二排放量（基于位置）
-            'scope_2_market': scope_2_market,      # 范围二排放量（基于市场）
-            'scope_3': scope_3,                     # 范围三排放量
-            'total_emission_location': total_emission_location,  # 总排放量（基于位置）
-            'total_emission_market': total_emission_market,        # 总排放量（基于市场）
-            'file_type': 'excel'
-        } 
+        # 将所有数据打包，保留之前添加的scope2_items、scope3_category1等变量
+        data['company_name'] = company_name
+        data['report_year'] = report_year
+        data['scope_1'] = scope_1  # 范围一排放量
+        data['scope_2_location'] = scope_2_location  # 范围二排放量（基于位置）
+        data['scope_2_market'] = scope_2_market      # 范围二排放量（基于市场）
+        data['scope_3'] = scope_3                     # 范围三排放量
+        data['total_emission_location'] = total_emission_location  # 总排放量（基于位置）
+        data['total_emission_market'] = total_emission_market        # 总排放量（基于市场）
+        data['file_type'] = 'excel' 
         
         print(f"数据提取完成: {data}") 
         return data
@@ -1144,8 +1505,744 @@ class ExcelDataReader:
             csv_reader = ExcelDataReader(csv_file_path)
             result['emission_reductions'] = csv_reader.read_to_list_of_dicts(skip_empty_rows=True)
             print(f"成功从CSV文件读取 {len(result['emission_reductions'])} 条减排行动数据")
-        
-        return result 
+
+        return result
+
+    def extract_data_from_xlsx_dynamic(self, xlsx_path=None):
+        """
+        纯 xlsx 数据源动态提取数据（不依赖固定行号，不使用 CSV）
+        对于缺失的数据，使用 None
+
+        Args:
+            xlsx_path: xlsx 文件路径，如果为 None 则使用初始化时的 filepath
+
+        Returns:
+            包含所有模板变量的字典
+        """
+        import openpyxl
+        import re
+
+        filepath = xlsx_path or self.filepath
+
+        # 如果传入的是当前 workbook，直接使用
+        if self.workbook and self.file_type == 'excel' and (xlsx_path is None or xlsx_path == self.filepath):
+            wb = self.workbook
+        else:
+            wb = openpyxl.load_workbook(filepath, data_only=True)
+
+        # 默认值（缺失数据为 None）
+        data = {
+            'company_profile': None,
+            'legal_person': None,
+            'registered_address': None,
+            'date_of_establishment': None,
+            'registered_capital': None,
+            'Unified_Social_Credit_Identifier': None,
+            'deadline': None,
+            'evaluation_level': None,
+            'evaluation_score': None,
+            'scope_of_business': None,
+            'rule_file': None,
+            'GWP_Value_Reference_Document': None,
+            'document_number': None,
+            'posted_time': None,
+            'production_address': None,
+            'source_file': filepath,
+            'scope_3_category_1_emissions': 0.0,
+            'scope_3_category_2_emissions': 0.0,
+            'scope_3_category_3_emissions': 0.0,
+            'scope_3_category_4_emissions': 0.0,
+            'scope_3_category_5_emissions': 0.0,
+            'scope_3_category_6_emissions': 0.0,
+            'scope_3_category_7_emissions': 0.0,
+            'scope_3_category_8_emissions': 0.0,
+            'scope_3_category_9_emissions': 0.0,
+            'scope_3_category_10_emissions': 0.0,
+            'scope_3_category_11_emissions': 0.0,
+            'scope_3_category_12_emissions': 0.0,
+            'scope_3_category_13_emissions': 0.0,
+            'scope_3_category_14_emissions': 0.0,
+            'scope_3_category_15_emissions': 0.0,
+        }
+
+        # ========== 基本信息（从"基本信息"工作表读取） ==========
+        from datetime import datetime
+
+        # 辅助函数：转换Excel日期序列号为日期字符串
+        def excel_date_to_string(date_value):
+            """将Excel日期序列号转换为 'YYYY年MM月DD日' 格式"""
+            if date_value is None:
+                return None
+            if isinstance(date_value, str):
+                return date_value
+            try:
+                # Excel日期基准是1899-12-30
+                delta = datetime.fromordinal(datetime(1900, 1, 1).toordinal() + int(date_value) - 2)
+                return delta.strftime('%Y年%m月%d日')
+            except (ValueError, TypeError):
+                return str(date_value)
+
+        # 检查是否存在"基本信息"工作表
+        if '基本信息' in wb.sheetnames:
+            basic_info_sheet = wb['基本信息']
+            print("找到'基本信息'工作表，开始读取...")
+
+            # 读取基本信息：第2列是属性代码(key)，第3列是值(value)
+            for row in basic_info_sheet.iter_rows(min_row=2, values_only=True):
+                if len(row) >= 3 and row[1] and row[2]:
+                    key = str(row[1]).strip()  # 第2列：属性代码
+                    value = row[2]  # 第3列：值
+
+                    # 处理日期字段
+                    if key in ['posted_time', 'date_of_establishment']:
+                        data[key] = excel_date_to_string(value)
+                    # 处理长文本字段（公司简介、经营范围等）：将换行符替换为空格，避免在Word中分段
+                    elif key in ['company_profile', 'scope_of_business']:
+                        if isinstance(value, str):
+                            # 将各种换行符统一替换为空格
+                            # 保留段落间的空格，移除多余的换行
+                            value = re.sub(r'[\n\r]+', ' ', value)
+                            # 移除多余的空格
+                            value = re.sub(r'\s+', ' ', value).strip()
+                        data[key] = value
+                    # 处理其他字段
+                    elif key in data:
+                        data[key] = value
+
+                    # 特殊字段映射
+                    if key == 'company_name':
+                        data['company_name'] = value
+                    elif key == 'reporting_period':
+                        data['reporting_period'] = value
+                        # 从周期中提取年份
+                        year_match = re.search(r'(\d{4})', str(value))
+                        data['report_year'] = year_match.group(1) if year_match else '2024'
+
+            print(f"从'基本信息'工作表读取完成，公司名称: {data.get('company_name')}")
+        else:
+            # 如果没有"基本信息"工作表，使用原来的方法
+            main_sheet = wb['温室气体盘查清册 (2)']
+            for row in main_sheet.iter_rows(max_row=20, values_only=True):
+                if len(row) >= 3:
+                    if row[1] == '组织名称：' and row[2]:
+                        data['company_name'] = row[2]
+                    elif row[1] == '组织地址：' and row[2]:
+                        data['registered_address'] = row[2]
+                        data['production_address'] = row[2]
+                    elif row[1] == '盘查覆盖周期:' and row[2]:
+                        data['reporting_period'] = row[2]
+
+            # 从周期中提取年份
+            if data.get('reporting_period'):
+                year_match = re.search(r'(\d{4})', str(data['reporting_period']))
+                data['report_year'] = year_match.group(1) if year_match else '2024'
+            else:
+                data['report_year'] = '2024'
+
+        # 确保 report_year 存在
+        if 'report_year' not in data:
+            data['report_year'] = '2024'
+
+        # ========== 排放数据（动态读取） ==========
+        table_sheet = wb['表1温室气体盘查表']
+
+        # 动态查找总排放量汇总行
+        for row in table_sheet.iter_rows(values_only=True):
+            a_val = row[0] if len(row) > 0 else None
+            b_val = row[1] if len(row) > 1 else None
+            c_val = row[2] if len(row) > 2 else None
+            d_val = row[3] if len(row) > 3 else None
+            e_val = row[4] if len(row) > 4 else None
+
+            if a_val and isinstance(a_val, str) and '排放量' in a_val:
+                if isinstance(b_val, (int, float)) and isinstance(c_val, (int, float)) and isinstance(d_val, (int, float)):
+                    data['scope_1_emissions'] = float(b_val)
+                    data['scope_2_location_based_emissions'] = float(c_val)
+                    data['scope_3_emissions'] = float(d_val)
+                    if isinstance(e_val, (int, float)):
+                        data['total_emission_location'] = float(e_val)
+                break
+
+        # 动态查找范围二基于市场的排放量
+        # 查找E列标注"基于市场"的行，取C列值
+        for row in table_sheet.iter_rows():
+            e_val = row[4].value if len(row) > 4 else None
+            c_val = row[2].value if len(row) > 2 else None
+            if e_val and isinstance(e_val, str) and '基于市场' in e_val:
+                if c_val and isinstance(c_val, (int, float)):
+                    data['scope_2_market_based_emissions'] = float(c_val)
+                    print(f"找到范围二基于市场排放量: {float(c_val)} (行{row[0].row})")
+                break
+
+        # 计算总排放量（基于市场）
+        data['total_emission_market'] = (
+            data.get('scope_1_emissions', 0) +
+            data.get('scope_2_market_based_emissions', 0) +
+            data.get('scope_3_emissions', 0)
+        )
+
+        # ========== 范围三分类数据（动态查找） ==========
+        scope3_mapping = {
+            '类别1': 'scope_3_category_1_emissions',
+            '类别2': 'scope_3_category_2_emissions',
+            '类别3': 'scope_3_category_3_emissions',
+            '类别4': 'scope_3_category_4_emissions',
+            '类别5': 'scope_3_category_5_emissions',
+            '类别6': 'scope_3_category_6_emissions',
+            '类别7': 'scope_3_category_7_emissions',
+            '类别8': 'scope_3_category_8_emissions',
+            '类别9': 'scope_3_category_9_emissions',
+            '类别10': 'scope_3_category_10_emissions',
+            '类别11': 'scope_3_category_11_emissions',
+            '类别12': 'scope_3_category_12_emissions',
+            '类别13': 'scope_3_category_13_emissions',
+            '类别14': 'scope_3_category_14_emissions',
+            '类别15': 'scope_3_category_15_emissions',
+        }
+
+        for category_key, var_name in scope3_mapping.items():
+            for row in table_sheet.iter_rows():
+                a_val = row[0].value if len(row) > 0 else None
+                if a_val and isinstance(a_val, str) and '范围三' in a_val and category_key in a_val:
+                    current_row_num = row[0].row
+                    if current_row_num + 2 <= table_sheet.max_row:
+                        emission_row = table_sheet[current_row_num + 2]
+                        b_val = emission_row[1].value if len(emission_row) > 1 else None
+                        if b_val and isinstance(b_val, (int, float)):
+                            data[var_name] = float(b_val)
+                    break
+
+        # ========== 添加 flags 标记 ==========
+        data['flags'] = {
+            'has_scope_1': data.get('scope_1_emissions', 0) > 0,
+            'has_scope_2_location': data.get('scope_2_location_based_emissions', 0) > 0,
+            'has_scope_2_market': data.get('scope_2_market_based_emissions', 0) > 0,
+            'has_scope_3': data.get('scope_3_emissions', 0) > 0,
+        }
+
+        # ========== 别名 ==========
+        data['scope_1'] = data.get('scope_1_emissions', 0)
+        data['scope_2_location'] = data.get('scope_2_location_based_emissions', 0)
+        data['scope_2_market'] = data.get('scope_2_market_based_emissions', 0)
+        data['scope_3'] = data.get('scope_3_emissions', 0)
+
+        # ========== 从表1温室气体盘查表提取表1和表2的数据 ==========
+        try:
+            # 查找表1温室气体盘查表
+            sheet1_data = None
+            for sheet in wb.worksheets:
+                if '表1' in sheet.title and '温室气体盘查表' in sheet.title:
+                    sheet1_data = sheet
+                    break
+
+            if sheet1_data:
+                print(f"找到表1温室气体盘查表: {sheet1_data.title}")
+                scope1_table_items = []  # 表1：范围一直接排放源
+                scope2_3_table_items = []  # 表2：范围二三间接排放源
+
+                # 从第5行开始（前4行是标题）
+                for row in sheet1_data.iter_rows(min_row=5):
+                    if len(row) < 7:
+                        continue
+
+                    # 获取各列数据
+                    seq = row[0].value  # 序号
+                    ghg_category = row[1].value  # GHG排放类别
+                    emission_source = row[2].value  # 排放源
+                    facility = row[3].value  # 设施
+                    boundary = row[4].value  # 组织边界
+
+                    # 跳过空行或标题行
+                    if not seq and not ghg_category:
+                        continue
+
+                    seq_str = str(seq).strip() if seq else ''
+                    ghg_str = str(ghg_category).strip() if ghg_category else ''
+                    source_str = str(emission_source).strip() if emission_source else ''
+                    facility_str = str(facility).strip() if facility else ''
+                    boundary_str = str(boundary).strip() if boundary else ''
+
+                    # 跳过标题行
+                    if seq_str == '序号' or ghg_str == 'GHG排放类别':
+                        continue
+
+                    # 表1：范围一
+                    if '范围一' in boundary_str:
+                        scope1_table_items.append({
+                            'name': ghg_str,  # GHG排放类别
+                            'number': seq_str,  # 序号
+                            'emission_source': source_str,  # 排放源
+                            'facility': facility_str  # 设施
+                        })
+
+                    # 表2：范围二三
+                    elif '范围二' in boundary_str or '范围三' in boundary_str:
+                        scope2_3_table_items.append({
+                            'name': ghg_str,  # GHG排放类别
+                            'number': seq_str,  # 序号
+                            'emission_source': source_str,  # 排放源
+                            'facility': facility_str  # 设施
+                        })
+
+                data['scope1_items'] = scope1_table_items
+                data['scope2_3_items'] = scope2_3_table_items
+                print(f"从表1温室气体盘查表提取范围一数据: {len(scope1_table_items)} 行")
+                print(f"从表1温室气体盘查表提取范围二三数据: {len(scope2_3_table_items)} 行")
+
+        except Exception as e:
+            print(f"从表1温室气体盘查表提取数据时出错: {e}")
+            import traceback
+            traceback.print_exc()
+
+        # ========== 从温室气体盘查清册表提取范围一详细表数据 ==========
+        try:
+            # 查找温室气体盘查清册表
+            inventory_sheet = None
+            for sheet in wb.worksheets:
+                if '盘查清册' in sheet.title:
+                    inventory_sheet = sheet
+                    break
+
+            if inventory_sheet:
+                print(f"找到温室气体盘查清册表: {inventory_sheet.title}")
+                scope1_detail_items = []  # 范围一详细表数据（从盘查清册提取）
+
+                # 从第14行开始（第12行是标题，第13行是单位）
+                for row in inventory_sheet.iter_rows(min_row=14):
+                    if len(row) < 13:
+                        continue
+
+                    # Excel结构：A=空, B=编号/类别名, C=排放源, D=排放设施, E=备注, F=总排放量, G=CO2, H=CH4, I=N2O, J=HFCs, K=PFCs, L=SF6, M=NF3
+                    # 注意：当是类别行时，B列包含类别名（如"范围一 直接排放"），C列为空
+                    #       当是数据行时，B列包含编号（如1.1），C列包含排放源名称
+                    col_b = row[1].value        # 编号或类别名
+                    col_c = row[2].value        # 排放源（仅数据行有值）
+                    facility = row[3].value      # 排放设施 (列D)
+                    note = row[4].value          # 备注 (列E)
+                    total_emission = row[5].value    # 总排放量 (列F)
+                    co2_emission = row[6].value      # CO2排放量 (列G)
+                    ch4_emission = row[7].value      # CH4排放量 (列H)
+                    n2o_emission = row[8].value      # N2O排放量 (列I)
+                    hfcs_emission = row[9].value     # HFCs排放量 (列J)
+                    pfcs_emission = row[10].value    # PFCs排放量 (列K)
+                    sf6_emission = row[11].value     # SF6排放量 (列L)
+                    nf3_emission = row[12].value     # NF3排放量 (列M)
+
+                    # 跳过空行
+                    if not col_b and not col_c:
+                        continue
+
+                    # 确定编号和排放源
+                    number_str = ''
+                    source_str = ''
+
+                    if col_b:
+                        col_b_str = str(col_b).strip()
+                        # 检查B列是否是编号格式（如"1.1", "1.1.1"）- 以数字开头
+                        if col_b_str and col_b_str[0].isdigit():
+                            number_str = col_b_str
+                            source_str = str(col_c).strip() if col_c else ''
+                        # B列是类别名称（如"范围一 直接排放"）
+                        else:
+                            # 跳过类别标题行（"范围一 直接排放"）
+                            continue
+
+                    facility_str = str(facility).strip() if facility else ''
+                    note_str = str(note).strip() if note else ''
+
+                    # 跳过标题行
+                    if not number_str or number_str == '编号':
+                        continue
+
+                    # 格式化排放量数字（保留两位小数）
+                    def format_emission(val):
+                        if val is None:
+                            return '0.00'
+                        try:
+                            return f"{float(val):.2f}"
+                        except (ValueError, TypeError):
+                            return '0.00'
+
+                    # 范围一：编号以1开头（如1.1, 1.1.1）
+                    if number_str.startswith('1.'):
+                        scope1_detail_items.append({
+                            'name': number_str,  # 始终使用编号作为name
+                            'number': number_str,
+                            'emission_source': source_str,
+                            'facility': facility_str,
+                            'note': note_str,
+                            'total_green_house_gas_emissions': format_emission(total_emission),
+                            'CO2_emissions': format_emission(co2_emission),
+                            'CH4_emissions': format_emission(ch4_emission),
+                            'N2O_emissions': format_emission(n2o_emission),
+                            'HFCs_emissions': format_emission(hfcs_emission),
+                            'PFCs_emissions': format_emission(pfcs_emission),
+                            'SFs_emissions': format_emission(sf6_emission),
+                            'NF3_emissions': format_emission(nf3_emission)
+                        })
+
+                # 分类范围一数据
+                scope1_stationary_combustion = []  # 固定源燃烧（1.1.x）
+                scope1_mobile_combustion = []      # 移动源燃烧（1.2.x）
+                scope1_fugitive = []                # 遗散源（1.3.x）
+                scope1_process = []                 # 工艺排放（如果有的话）
+
+                for item in scope1_detail_items:
+                    number = item.get('number', '')
+                    if number.startswith('1.1.'):
+                        scope1_stationary_combustion.append(item)
+                    elif number.startswith('1.2.'):
+                        scope1_mobile_combustion.append(item)
+                    elif number.startswith('1.3.'):
+                        scope1_fugitive.append(item)
+                    elif number.startswith('1.4.'):
+                        scope1_process.append(item)
+
+                # 注意：scope1_items和scope2_3_items已经从"表1温室气体盘查表"提取，不再覆盖
+
+                # 添加分类列表（注意：模板中使用的是 _items 后缀）
+                data['scope1_stationary_combustion_emissions_items'] = scope1_stationary_combustion
+                data['scope1_mobile_combustion_emissions_items'] = scope1_mobile_combustion
+                data['scope1_fugitive_emissions_items'] = scope1_fugitive
+                data['scope1_process_emissions_items'] = scope1_process
+
+                # 计算各类别的汇总值
+                emission_columns = [
+                    'total_green_house_gas_emissions',
+                    'CO2_emissions',
+                    'CH4_emissions',
+                    'N2O_emissions',
+                    'HFCs_emissions',
+                    'PFCs_emissions',
+                    'SFs_emissions',
+                    'NF3_emissions'
+                ]
+
+                # 先计算各分类的汇总值
+                # 固定源燃烧汇总
+                for col in emission_columns:
+                    total = sum(float(item.get(col, '0').replace(',', '')) for item in scope1_stationary_combustion)
+                    data[f'scope1_stationary_combustion_emissions_{col}_sum_formatted'] = f"{total:.2f}"
+
+                # 移动源燃烧汇总
+                for col in emission_columns:
+                    total = sum(float(item.get(col, '0').replace(',', '')) for item in scope1_mobile_combustion)
+                    data[f'scope1_mobile_combustion_emissions_{col}_sum_formatted'] = f"{total:.2f}"
+
+                # 遗散源汇总
+                for col in emission_columns:
+                    total = sum(float(item.get(col, '0').replace(',', '')) for item in scope1_fugitive)
+                    data[f'scope1_fugitive_emissions_{col}_sum_formatted'] = f"{total:.2f}"
+
+                # 工艺排放汇总
+                for col in emission_columns:
+                    total = sum(float(item.get(col, '0').replace(',', '')) for item in scope1_process)
+                    data[f'scope1_process_emissions_{col}_sum_formatted'] = f"{total:.2f}"
+
+                # 范围一总计 = 各分类汇总的和（避免重复计算类别行的排放量）
+                for col in emission_columns:
+                    stationary_total = float(data[f'scope1_stationary_combustion_emissions_{col}_sum_formatted'])
+                    mobile_total = float(data[f'scope1_mobile_combustion_emissions_{col}_sum_formatted'])
+                    fugitive_total = float(data[f'scope1_fugitive_emissions_{col}_sum_formatted'])
+                    process_total = float(data[f'scope1_process_emissions_{col}_sum_formatted'])
+                    total = stationary_total + mobile_total + fugitive_total + process_total
+                    data[f'scope1_emissions_{col}_sum_formatted'] = f"{total:.2f}"
+
+                print(f"从温室气体盘查清册提取范围一详细表数据: {len(scope1_detail_items)} 行")
+                print(f"  固定源燃烧: {len(scope1_stationary_combustion)} 行")
+                print(f"  移动源燃烧: {len(scope1_mobile_combustion)} 行")
+                print(f"  遗散源: {len(scope1_fugitive)} 行")
+            else:
+                print("警告：未找到温室气体盘查清册表")
+
+        except Exception as e:
+            print(f"从温室气体盘查清册提取数据时出错: {e}")
+            import traceback
+            traceback.print_exc()
+
+        # ========== 从温室气体盘查表提取scope2_items（两行：基于位置和基于市场）==========
+        try:
+            # 查找温室气体盘查表
+            pandata_sheet = None
+            for sheet in wb.worksheets:
+                if '盘查表' in str(sheet.title):
+                    pandata_sheet = sheet
+                    break
+
+            if pandata_sheet:
+                print(f"找到温室气体盘查表: {pandata_sheet.title}")
+                scope2_items = []
+
+                # 查找包含"汇总"和"外购电力"的行
+                location_total = None
+                market_total = None
+
+                # 尝试匹配包含"汇总"或"Total"的行
+                total_keywords = ['汇总', '总计', 'Total', 'TOTAL', '\u6c47\u603b', '\u603b\u8ba1']
+
+                for row_idx, row in enumerate(pandata_sheet.iter_rows(min_row=1, values_only=True), start=1):
+                    first_col = str(row[0]).strip() if row[0] else ''
+                    second_col = str(row[1]).strip() if len(row) > 1 else ''
+                    fourth_col = str(row[4]).strip() if len(row) > 4 else ''
+
+                    # 检查是否是汇总行（使用多种方式匹配）
+                    is_total_row = any(keyword in first_col or first_col == keyword for keyword in total_keywords)
+                    has_electricity = '外购' in second_col or '电力' in second_col or 'Purchased' in second_col or 'Electricity' in second_col
+
+                    if is_total_row and has_electricity:
+                        # 检查第四列来判断是基于位置还是基于市场
+                        is_location = '位置' in fourth_col or 'Location' in fourth_col or 'location' in fourth_col
+                        is_market = '市场' in fourth_col or 'Market' in fourth_col or 'market' in fourth_col
+
+                        if is_location:
+                            location_total = row
+                            print(f"  找到外购电力（基于位置）汇总: Row {row_idx}, fourth_col='{fourth_col}'")
+                        elif is_market:
+                            market_total = row
+                            print(f"  找到外购电力（基于市场）汇总: Row {row_idx}, fourth_col='{fourth_col}'")
+
+                # 构建两行数据
+                if location_total:
+                    total = self._safe_float(location_total[2]) if len(location_total) > 2 else 0
+                    co2 = self._safe_float(location_total[3]) if len(location_total) > 3 else total
+
+                    total_formatted = f"{total:,.2f}" if total > 0 else "0.00"
+                    co2_formatted = f"{co2:,.2f}" if co2 > 0 else "0.00"
+
+                    scope2_items.append({
+                        'number': '2.1',
+                        'emission_source': '外购电力（基于位置）',
+                        'total_green_house_gas_emissions': total_formatted,
+                        'CO2_emissions': co2_formatted,
+                        'CH4_emissions': '0.00',
+                        'N2O_emissions': '0.00',
+                        'HFCs_emissions': '0.00',
+                        'PFCs_emissions': '0.00',
+                        'SFs_emissions': '0.00',
+                        'NF3_emissions': '0.00'
+                    })
+                    print(f"  提取2.1 外购电力（基于位置）: {total_formatted} tCO2e")
+
+                if market_total:
+                    total = self._safe_float(market_total[2]) if len(market_total) > 2 else 0
+                    co2 = self._safe_float(market_total[3]) if len(market_total) > 3 else total
+
+                    total_formatted = f"{total:,.2f}" if total > 0 else "0.00"
+                    co2_formatted = f"{co2:,.2f}" if co2 > 0 else "0.00"
+
+                    scope2_items.append({
+                        'number': '2.2',
+                        'emission_source': '外购电力（基于市场）',
+                        'total_green_house_gas_emissions': total_formatted,
+                        'CO2_emissions': co2_formatted,
+                        'CH4_emissions': '0.00',
+                        'N2O_emissions': '0.00',
+                        'HFCs_emissions': '0.00',
+                        'PFCs_emissions': '0.00',
+                        'SFs_emissions': '0.00',
+                        'NF3_emissions': '0.00'
+                    })
+                    print(f"  提取2.2 外购电力（基于市场）: {total_formatted} tCO2e")
+
+                data['scope2_items'] = scope2_items
+                print(f"提取到范围二输入能源排放明细: {len(scope2_items)} 行")
+            else:
+                print("警告：未找到温室气体盘查表")
+                data['scope2_items'] = []
+
+        except Exception as e:
+            print(f"提取scope2_items时出错: {e}")
+            import traceback
+            traceback.print_exc()
+            data['scope2_items'] = []
+
+        # ========== 从温室气体盘查表提取scope3_items（范围三各类别排放明细）==========
+        # 提取详细排放源数据，而不是仅提取类别汇总
+        try:
+            # 查找温室气体盘查表（确保可以找到）
+            pandata_sheet = None
+            for sheet in wb.worksheets:
+                if '盘查表' in str(sheet.title):
+                    pandata_sheet = sheet
+                    break
+
+            if pandata_sheet:
+                print(f"从温室气体盘查表提取范围三详细数据")
+                scope3_items = []
+
+                # 范围三类别名称映射
+                category_names = {
+                    '类别1': '外购商品和服务上游排放',
+                    '类别2': '资本货物上游排放',
+                    '类别3': '燃料和能源相关活动未包含在范围一和范围二中的上游排放',
+                    '类别4': '上游运输和配送',
+                    '类别5': '运营中产生的废弃物',
+                    '类别6': '员工商务旅行',
+                    '类别7': '员工通勤',
+                    '类别8': '上游租赁资产',
+                    '类别9': '下游运输和配送',
+                    '类别10': '销售产品的加工',
+                    '类别11': '销售产品的使用',
+                    '类别12': '售出产品的加工',
+                    '类别13': '下游租赁资产',
+                    '类别14': '特许经营',
+                    '类别15': '投资'
+                }
+
+                # 第一步：收集所有详细排放源行（按类别分组）
+                category_detail_rows = {}  # {category_num: [row_data, ...]}
+
+                for row_idx, row in enumerate(pandata_sheet.iter_rows(min_row=1, values_only=True), start=1):
+                    row_vals = [str(v) if v is not None else '' for v in row[:12]]
+
+                    # 检查是否是详细排放源行
+                    # 特征：第1列是数字（行ID），第4列包含"范围三 类别X"
+                    if row_vals[0] and row_vals[0].isdigit():
+                        if len(row_vals) > 4 and '范围三' in row_vals[4] and '类别' in row_vals[4]:
+                            # 提取类别编号
+                            category_match = re.search(r'类别\s*(\d+)', row_vals[4])
+                            if category_match:
+                                category_num = int(category_match.group(1))
+                                if category_num not in category_detail_rows:
+                                    category_detail_rows[category_num] = []
+                                category_detail_rows[category_num].append({
+                                    'row_idx': row_idx,
+                                    'data': row
+                                })
+
+                # 第二步：为每个类别的每个详细排放源创建数据项，按类别分组存储
+                # 模板期望的数据格式：scope3_category1, scope3_category2, ..., scope3_category15
+                total_scope3_items = 0
+                for category_num in sorted(category_detail_rows.keys()):
+                    detail_rows = category_detail_rows[category_num]
+                    category_key = f'类别{category_num}'
+                    category_var_name = f'scope3_category{category_num}'
+
+                    category_items = []
+                    sub_num = 0
+                    for row_info in detail_rows:
+                        row = row_info['data']
+                        row_vals = [str(v) if v is not None else '' for v in row[:12]]
+
+                        # 提取数据
+                        # 列0: 行ID, 列1: 类别/组名, 列2: 排放源名称
+                        emission_source_name = row_vals[2] if len(row_vals) > 2 and row_vals[2] else category_key
+
+                        # 列5: 活动数据数量, 列6: 活动数据单位, 列7: 排放因子, 列8: 排放因子单位
+                        activity_data = self._safe_float(row[5]) if len(row) > 5 and row[5] else 0
+                        activity_unit = row_vals[6] if len(row_vals) > 6 else ''
+                        emission_factor = self._safe_float(row[7]) if len(row) > 7 and row[7] else 0
+                        factor_unit = row_vals[8] if len(row_vals) > 8 else ''
+
+                        # 计算排放量（需要根据单位进行转换）
+                        calculated_emission = 0
+                        if activity_data > 0 and emission_factor > 0:
+                            # 检查是否需要单位转换
+                            # 规则：
+                            # - kgCO2/kg, kgCO2/t, tCO2/t 等比值单位：不需要转换（1 kg/kg = 1 t/t）
+                            # - kgCO2/unit, kg CO2/unit 等绝对值单位：需要除以1000转换为 tCO2/unit
+                            factor_in_tons = emission_factor
+
+                            # 只有当单位是 "每单位质量的kgCO2" 且不是比值时才转换
+                            # kgCO2/kg, kgCO2/t 是比值，等于 tCO2/t，不需要转换
+                            # kgCO2/(其他单位) 需要转换为 tCO2/(其他单位)
+                            if factor_unit:
+                                # 检查是否是比值单位（分母是质量单位）
+                                is_ratio_unit = any(u in factor_unit for u in ['kgCO2/kg', 'kgCO2/t', 'tCO2/kg', 'tCO2/t'])
+                                # 检查是否需要转换（kgCO2或kg CO2但不是比值）
+                                needs_conversion = ('kgCO2' in factor_unit or 'kg CO2' in factor_unit) and not is_ratio_unit
+
+                                if needs_conversion:
+                                    factor_in_tons = emission_factor / 1000
+
+                            calculated_emission = activity_data * factor_in_tons
+
+                        # 只添加有排放量的项目（排放量 > 0.01）
+                        if calculated_emission > 0.01:
+                            sub_num += 1
+                            total_formatted = f"{calculated_emission:,.2f}"
+                            co2_formatted = f"{calculated_emission:,.2f}"
+
+                            category_items.append({
+                                'number': f'3.{category_num}.{sub_num}',
+                                'emission_source': emission_source_name,
+                                'total_green_house_gas_emissions': total_formatted,
+                                'CO2_emissions': co2_formatted,
+                                'CH4_emissions': '0.00',
+                                'N2O_emissions': '0.00',
+                                'HFCs_emissions': '0.00',
+                                'PFCs_emissions': '0.00',
+                                'SFs_emissions': '0.00',
+                                'NF3_emissions': '0.00'
+                            })
+
+                    # 将类别数据存储到对应的变量中
+                    data[category_var_name] = category_items
+                    total_scope3_items += len(category_items)
+                    if category_items:
+                        print(f"  提取{category_var_name}: {len(category_items)} 行")
+
+                # 计算每个类别的总排放量（从详细数据汇总）
+                # 如果从"表格"sheet没有提取到汇总数据，则从详细数据计算
+                print("  验证类别总排放量...")
+                calculated_from_detail = []
+                for cat_num in range(1, 16):
+                    cat_var = f'scope3_category{cat_num}'
+                    emission_key = f'scope_3_category_{cat_num}_emissions'
+
+                    # 如果该类别有详细数据
+                    if cat_var in data and data[cat_var]:
+                        # 汇总该类别所有详细项的排放量
+                        category_total = 0
+                        for item in data[cat_var]:
+                            # 从total_green_house_gas_emissions字段提取数值
+                            emission_str = item.get('total_green_house_gas_emissions', '0')
+                            # 去除逗号和空格
+                            emission_str = emission_str.replace(',', '').replace(' ', '')
+                            try:
+                                emission_value = float(emission_str)
+                                category_total += emission_value
+                            except (ValueError, TypeError):
+                                pass
+
+                        # 如果"表格"sheet没有提取到数据，使用计算值
+                        if data.get(emission_key, 0) == 0 and category_total > 0:
+                            data[emission_key] = category_total
+                            calculated_from_detail.append(cat_num)
+                            print(f"    [+] 类别{cat_num}: {category_total:,.2f} tCO2e (从详细数据计算)")
+                        elif category_total > 0:
+                            # 验证：表格值 vs 详细数据计算值
+                            table_value = data.get(emission_key, 0)
+                            diff = abs(table_value - category_total)
+                            if diff > 0.01:  # 差异超过0.01时警告
+                                print(f"    [!] 类别{cat_num}: 表格值={table_value:,.2f}, 计算值={category_total:,.2f}, 差异={diff:,.2f}")
+                            else:
+                                print(f"    [OK] 类别{cat_num}: {category_total:,.2f} tCO2e")
+
+                if calculated_from_detail:
+                    print(f"  注意: 类别{calculated_from_detail}从详细数据计算得到")
+
+                # 同时保留scope3_items用于兼容
+                data['scope3_items'] = []
+                for cat_num in range(1, 16):
+                    cat_var = f'scope3_category{cat_num}'
+                    if cat_var in data:
+                        data['scope3_items'].extend(data[cat_var])
+
+                print(f"提取到范围三详细排放明细总计: {total_scope3_items} 行")
+            else:
+                print("警告：未找到温室气体盘查表，无法提取范围三数据")
+                data['scope3_items'] = []
+
+        except Exception as e:
+            print(f"提取scope3_items时出错: {e}")
+            import traceback
+            traceback.print_exc()
+            data['scope3_items'] = []
+
+        print(f"纯 xlsx 动态提取完成，范围三类别数据: {sum(1 for i in range(1, 16) if data.get(f'scope_3_category_{i}_emissions', 0) > 0)} 个类别有数据")
+
+        return data
 
 # 测试函数
 if __name__ == "__main__": 
