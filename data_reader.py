@@ -12,7 +12,77 @@ class ExcelDataReader:
         except (ValueError, TypeError):
             return 0.0
 
-    def __init__(self, filepath): 
+    def _update_flags(self, data):
+        """更新 Flags 标记系统"""
+        if 'flags' not in data:
+            data['flags'] = {}
+
+        def safe_float(value):
+            try:
+                return float(value)
+            except (ValueError, TypeError):
+                return 0.0
+
+        data['flags']['has_scope_1'] = safe_float(data.get('scope_1_emissions', 0)) > 0
+        data['flags']['has_scope_2_location'] = safe_float(data.get('scope_2_location_based_emissions', 0)) > 0
+        data['flags']['has_scope_2_market'] = safe_float(data.get('scope_2_market_based_emissions', 0)) > 0
+        data['flags']['has_scope_3'] = safe_float(data.get('scope_3_emissions', 0)) > 0
+
+        for i in range(1, 16):
+            key = f'scope_3_category_{i}_emissions'
+            flag_key = f'has_scope_3_category_{i}'
+            data['flags'][flag_key] = safe_float(data.get(key, 0)) > 0
+
+        return data
+
+    def get_quantification_methods(self):
+        """返回各类别的量化方法说明"""
+        return {
+            'scope_1': {
+                '固定燃烧': '活动数据：燃料消耗量（吨或立方米）× 排放因子（kgCO2e/单位燃料）',
+                '移动燃烧': '活动数据：燃料消耗量（升）× 排放因子（kgCO2e/升）',
+                '散逸排放': '活动数据：制冷剂充注量（kg）× GWP值 × 排放因子',
+                '工艺过程排放': '活动数据：原料消耗量（吨）× 排放因子（kgCO2e/吨）'
+            },
+            'scope_2': {
+                '外购电力': '活动数据：外购电力电量（kWh）× 电网排放因子（kgCO2e/kWh）',
+                '外购热力': '活动数据：外购蒸汽量（GJ）× 排放因子（kgCO2e/GJ）'
+            },
+            'scope_3': {
+                'category_1': '外购商品和服务：活动数据为采购金额（万元）× 经济排放因子',
+                'category_2': '资本货物：活动数据为设备投资额（万元）× 经济排放因子',
+                'category_3': '燃料和能源相关逸出排放：活动数据为外购能源量 × 上游排放因子',
+                'category_4': '上下游运输配送：活动数据为运输距离（km）× 货物重量（吨）× 排放因子',
+                'category_5': '运营中废弃物：活动数据为废弃物量（吨）× 排放因子',
+                'category_6': '员工商务差旅：活动数据为飞行里程（km）× 排放因子',
+                'category_7': '员工通勤：活动数据为通勤距离（km）× 排放因子',
+                'category_8': '上游租赁资产：该类别数据不具备重要性，不进行量化',
+                'category_9': '运营中输入运输配送：活动数据为运输量（吨·km）× 排放因子',
+                'category_10': '已售产品使用：活动数据为产品数量 × 使用阶段排放因子',
+                'category_11': '已售产品加工：该类别数据不具备重要性，不进行量化',
+                'category_12': '已售产品报废：活动数据为产品数量 × 报废处理排放因子'
+            }
+        }
+
+    def get_scope_3_category_name(self, category_num):
+        """获取范围三类别名称"""
+        names = {
+            1: "外购商品和服务",
+            2: "资本货物",
+            3: "燃料和能源相关逸出排放",
+            4: "上下游运输和配送",
+            5: "运营中产生的废弃物",
+            6: "员工商务差旅",
+            7: "员工上下班通勤",
+            8: "上游租赁资产",
+            9: "运营中输入的运输和配送",
+            10: "已售产品的使用过程",
+            11: "已售产品的加工",
+            12: "已售产品的报废处理"
+        }
+        return names.get(category_num, f"类别{category_num}")
+
+    def __init__(self, filepath):
         """ 
         初始化时，加载 Excel 工作簿。 
         """ 
@@ -666,6 +736,26 @@ class ExcelDataReader:
                             break
                     else:
                         result[row_label][col_label] = None
+            # Initialize Flags
+            if 'flags' not in result:
+                result['flags'] = {
+                    'has_scope_1': False,
+                    'has_scope_2_location': False,
+                    'has_scope_2_market': False,
+                    'has_scope_3': False,
+                }
+
+            # Update flags based on data
+            result = self._update_flags(result)
+
+            # Add quantification methods data
+            result['quantification_methods'] = self.get_quantification_methods()
+
+            # Add scope 3 category names mapping
+            result['scope_3_category_names'] = {}
+            for i in range(1, 13):
+                result['scope_3_category_names'][f'category_{i}'] = self.get_scope_3_category_name(i)
+
 
             return result
 
@@ -782,20 +872,42 @@ class ExcelDataReader:
         data = {}
         data.update(default_values)
 
-        # ========== 跳过CSV文件读取，直接从Excel读取所有数据 ==========
-        # 注释掉CSV处理逻辑，改为只从Excel读取
-        # import os
-        # csv_path = '减排行动统计.csv'
-        # if os.path.exists(csv_path):
-
-        # 为了保持原有逻辑结构，这里直接设置csv_exists为False
-        csv_exists = False
-
-        if csv_exists:  # 永远为False，跳过CSV处理
-            csv_data = self.read_emission_data_csv(csv_path)
-            if csv_data:
-                data.update(csv_data)
-                print(f"从CSV文件成功读取 {len(csv_data)} 个变量")
+        # ========== 从CSV文件读取基本信息 ==========
+        import os
+        csv_path = '减排行动统计.csv'
+        if os.path.exists(csv_path):
+            # 只从CSV读取基本信息字段（不读取排放数据）
+            try:
+                import csv
+                encodings = ['utf-8', 'gbk', 'gb2312']
+                csv_basic_data = {}
+                
+                for encoding in encodings:
+                    try:
+                        with open(csv_path, 'r', encoding=encoding) as f:
+                            csv_reader = csv.reader(f)
+                            for row in csv_reader:
+                                if len(row) >= 2:
+                                    key = row[0].strip()
+                                    value = row[1].strip()
+                                    # 只读取基本信息字段
+                                    if key in ['reporting_period', 'document_number', 'posted_time', 
+                                              'legal_person', 'registered_capital', 'date_of_establishment',
+                                              'registered_address', 'production_address', 'company_profile',
+                                              'deadline', 'evaluation_level', 'evaluation_score',
+                                              'Unified_Social_Credit_Identifier', 'GWP_Value_Reference_Document',
+                                              'rule_file']:
+                                        csv_basic_data[key] = value
+                        print(f"成功从CSV读取基本信息 (编码: {encoding})")
+                        break
+                    except:
+                        continue
+                
+                # 更新基本信息到data字典
+                data.update(csv_basic_data)
+                print(f"从CSV读取了 {len(csv_basic_data)} 个基本信息字段")
+            except Exception as e:
+                print(f"读取CSV基本信息时出错: {e}")
 
                 # ========== 将排放数据转换为 float 类型（保持数据层纯净）==========
                 # 格式化（加逗号、保留小数）是展示层（View Layer/Writer）的事
@@ -1334,13 +1446,29 @@ class ExcelDataReader:
             print(f"获取scope_1值时出错: {e}")
         
         # 提取范围二排放量
-        # 使用find_value_by_label方法替代硬坐标
-        scope_2_location = self.find_value_by_label(table_sheet, '基于位置')
-        scope_2_market = self.find_value_by_label(table_sheet, '基于市场')
-        
-        # 如果直接查找失败，回退到原始方法
-        if scope_2_location is None:
-            scope_2_location = self.find_value_by_label(table_sheet, '范围二')
+        # 先尝试从scope2_items计算（更可靠的方法）
+        if 'scope2_items' in data and len(data['scope2_items']) >= 2:
+            try:
+                # 第1项通常是外购电力（基于位置）
+                scope_2_location_str = data['scope2_items'][0].get('total_green_house_gas_emissions', '0')
+                scope_2_location = float(str(scope_2_location_str).replace(',', '').replace(' ', ''))
+                
+                # 第2项通常是外购热力（基于市场）
+                scope_2_market_str = data['scope2_items'][1].get('total_green_house_gas_emissions', '0')
+                scope_2_market = float(str(scope_2_market_str).replace(',', '').replace(' ', ''))
+                
+                print(f"从scope2_items计算范围二排放:")
+                print(f"  基于位置: {scope_2_location:,.2f}")
+                print(f"  基于市场: {scope_2_market:,.2f}")
+            except Exception as e:
+                print(f"从scope2_items计算范围二失败: {e}")
+                # 如果失败，使用原始方法
+                scope_2_location = self.find_value_by_label(table_sheet, '基于位置')
+                scope_2_market = self.find_value_by_label(table_sheet, '基于市场')
+        else:
+            # 回退到原始方法
+            scope_2_location = self.find_value_by_label(table_sheet, '基于位置')
+            scope_2_market = self.find_value_by_label(table_sheet, '基于市场')
         
         # 提取范围三排放量
         scope_3 = None
@@ -1469,6 +1597,28 @@ class ExcelDataReader:
             print(f"获取总排放量时出错: {e}")
         
         # 将所有数据打包，保留之前添加的scope2_items、scope3_category1等变量
+
+        # 计算范围三各类别的排放量（用于模板显示）
+        for i in range(1, 13):
+            cat_key = f'scope3_category{i}'
+            if cat_key in data and data[cat_key]:
+                # 计算该类别的总排放量
+                total_emission = 0.0
+                for item in data[cat_key]:
+                    emission_str = item.get('total_green_house_gas_emissions', '0')
+                    # 移除逗号和空格
+                    emission_str = str(emission_str).replace(',', '').replace(' ', '')
+                    try:
+                        emission = float(emission_str)
+                        total_emission += emission
+                    except:
+                        pass
+                
+                # 添加到data字典
+                data[f'scope_3_category_{i}_emissions'] = total_emission
+                
+                if i <= 3:  # 只打印前3个
+                    print(f"  category_{i} 总排放量: {total_emission:,.2f}")
         data['company_name'] = company_name
         data['report_year'] = report_year
         data['scope_1'] = scope_1  # 范围一排放量
@@ -1480,37 +1630,42 @@ class ExcelDataReader:
         data['file_type'] = 'excel' 
         
         print(f"数据提取完成: {data}") 
+        
+        # Initialize Flags
+        if 'flags' not in data:
+            data['flags'] = {
+                'has_scope_1': False,
+                'has_scope_2_location': False,
+                'has_scope_2_market': False,
+                'has_scope_3': False,
+            }
+
+        # Update flags based on data
+        data = self._update_flags(data)
+
+        # Add quantification methods data
+        data['quantification_methods'] = self.get_quantification_methods()
+
+        # Add scope 3 category names mapping
+        data['scope_3_category_names'] = {}
+        for i in range(1, 13):
+            data['scope_3_category_names'][f'category_{i}'] = self.get_scope_3_category_name(i)
+        # 确保表格数据存在（模板需要这些字段）
+        if 'scope1_items' not in data or 'scope2_3_items' not in data:
+            print("警告：scope1_items或scope2_3_items缺失，尝试从scope2_items生成...")
+            
+            # 如果scope1_items缺失，创建空的列表
+            if 'scope1_items' not in data:
+                data['scope1_items'] = []
+            
+            # 如果scope2_3_items缺失，使用scope2_items创建
+            if 'scope2_3_items' not in data and 'scope2_items' in data:
+                data['scope2_3_items'] = data['scope2_items']
+        
         return data
-        
-    def extract_all_data(self):
-        """ 
-        提取所有数据，包括从Excel文件和CSV文件中提取的内容。
-        整合了温室气体排放数据和减排行动数据。
-        """
-        # 默认返回值
-        result = {
-            'greenhouse_gas_data': {},
-            'emission_reductions': []
-        }
-        
-        # 首先处理Excel文件（如果有）
-        if self.file_type == 'excel' and self.workbook:
-            result['greenhouse_gas_data'] = self.extract_data()
-        
-        # 检查是否有减排行动CSV文件
-        import os
-        csv_file_path = 'D:\\my_report_generator\\减排行动统计.csv'
-        if os.path.exists(csv_file_path):
-            # 创建一个临时的ExcelDataReader实例来读取CSV文件
-            csv_reader = ExcelDataReader(csv_file_path)
-            result['emission_reductions'] = csv_reader.read_to_list_of_dicts(skip_empty_rows=True)
-            print(f"成功从CSV文件读取 {len(result['emission_reductions'])} 条减排行动数据")
-
-        return result
-
     def extract_data_from_xlsx_dynamic(self, xlsx_path=None):
         """
-        纯 xlsx 数据源动态提取数据（不依赖固定行号，不使用 CSV）
+        纯 xlsx 数据源动态提取数据(不依赖固定行号，不使用 CSV)
         对于缺失的数据，使用 None
 
         Args:
@@ -2242,9 +2397,20 @@ class ExcelDataReader:
 
         print(f"纯 xlsx 动态提取完成，范围三类别数据: {sum(1 for i in range(1, 16) if data.get(f'scope_3_category_{i}_emissions', 0) > 0)} 个类别有数据")
 
+        # Add quantification methods data
+        data['quantification_methods'] = self.get_quantification_methods()
+
+        # Add scope 3 category names mapping
+        data['scope_3_category_names'] = {}
+        for i in range(1, 13):
+            data['scope_3_category_names'][f'category_{i}'] = self.get_scope_3_category_name(i)
+
+
+        # Update flags based on data
+        data = self._update_flags(data)
         return data
 
-# 测试函数
+
 if __name__ == "__main__": 
     # 测试1: Excel数据读取
     reader = ExcelDataReader('test_data.xlsx') 

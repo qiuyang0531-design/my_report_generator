@@ -1,0 +1,2451 @@
+{
+  "company_profile": "大冶特殊钢有限公司（简称：大冶特钢）是中国近代“钢铁摇篮”，地处中国矿冶之都、先进制造业基地湖北省黄石市。隶属中信泰富特钢集团，是其沿海沿江产业链的战略布局中的重要一环。 大冶特钢是国家高新技术企业、全国首批两化融合示范企业、全国首批绿色制造示范企业、全国绿化模范单位。拥有国家认定企业技术中心、院士专家工作站、博士后科研工作站、高品质特殊钢湖北省重点实验室，先后承担国家多项冶金课题的项目攻关，主持或参与起草修订了多项国家和行业技术标准。先后荣获“全国质量奖”、“全国质量标杆”、“中国工业大奖表彰奖”，多项产品荣获国家冶金产品实物质量“金杯奖”、“国家科学技术进步一等奖、二等奖”、“冶金科学技术奖一等奖”、“国家知识产权优势企业”、“中国航天突出贡献供应商”、“中国工模具行业最具影响力钢厂品牌”等奖项。 大冶特钢是中国品种规格最齐全的高品质棒材、高端中厚壁无缝钢管、高合金锻材三大特钢生产基地，工艺技术和装备具备世界先进水平。主要产品有轴承钢、汽车用钢、能源用钢、工程机械用钢、航空航天用钢等。主要服务于航天航空、海洋、核电、风电、交通、火电、油气、工程机械、重燃、船舶、石化、汽车、高铁等关键领域。 从中国第一炉电渣钢到第一根极薄壁高温合金旋压管，从第一个飞机用高温合金涡轮盘，到第一根轧制的飞机大梁(毛坯)，从中国第一颗人造地球卫星，到神舟系列飞船的上天，到“嫦娥”奔月，再到“天宫”“北斗”发射升空，大冶特钢均提供了关键部件的用钢。工程机械用无缝钢管已连续13年产销量全国第一、13年全球第一，石油工具及装备用中厚壁无缝钢管连续10年产销量全国第一，大口径厚壁高压锅炉用管连续5年产销量全国第一。 大冶特钢秉承“诚信、创新、融合、卓越”的理念，牢记为客户创造价值，为员工创造幸福，为股东创造效益，为社会创造财富的企业使命，致力于为客户提供多规格、多品种、高品质的特殊钢产品及整体服务方案，致力于“创建全球最具竞争力的特钢企业集团”。",
+  "legal_person": "蒋乔",
+  "registered_address": "湖北省黄石市黄石大道316号",
+  "date_of_establishment": "2007年03月09日",
+  "registered_capital": "207218.53万元",
+  "Unified_Social_Credit_Identifier": "91420000798750168P",
+  "deadline": "2025年6月底前",
+  "evaluation_level": null,
+  "evaluation_score": null,
+  "scope_of_business": "大冶特殊钢有限公司成立于2007年03月09日，注册地位于湖北省黄石市黄石大道316号，法定代表人为蒋乔。经营范围包括黑色、有色金属冶炼、压延加工；生产、销售高温合金材料、耐蚀合金材料、铁矿石、钢坯、钢锭、钢材、金属制品、钢管及管件和相应的工业辅助材料及承接来料加工业务；钢铁和合金材料检测；再生资源回收经营；货物或技术进出口（国家限定公司经营或禁止进出口的商品和技术除外）；机械零件、汽车零部件制造和加工；机械、仪表、电器制造和修理；化工产品（不含危险品和限制类产品）制造；港口码头建设及经营；煤气、热力、自来水、工业用水生产和供应；餐饮经营与管理。（涉及许可经营项目，应取得相关部门许可后方可经营）。",
+  "rule_file": "《大冶特殊钢温室气体盘查控制程序（DY-GHG-2023）》",
+  "GWP_Value_Reference_Document": "IPCC 2021年出具的《第六次评估报告AR6》",
+  "document_number": "DY-GHG-2025-02",
+  "posted_time": "2025年07月03日",
+  "production_address": "湖北省黄石市黄石大道316号",
+  "source_file": "《温室气体盘查清册》-表2 不确定性评估",
+  "scope_3_category_1_emissions": 2710165.61935046,
+  "scope_3_category_2_emissions": 0,
+  "scope_3_category_3_emissions": 2016736.07196272,
+  "scope_3_category_4_emissions": 0,
+  "scope_3_category_5_emissions": 0,
+  "scope_3_category_6_emissions": 0,
+  "scope_3_category_7_emissions": 0,
+  "scope_3_category_8_emissions": 0,
+  "scope_3_category_9_emissions": 0,
+  "scope_3_category_10_emissions": 0,
+  "scope_3_category_11_emissions": 0,
+  "scope_3_category_12_emissions": 0,
+  "scope_3_category_13_emissions": 0,
+  "scope_3_category_14_emissions": 0,
+  "scope_3_category_15_emissions": 0,
+  "company_name": "大冶特殊钢有限公司",
+  "reporting_period": "2024年1月1日至2024年12月31日",
+  "report_year": "2024",
+  "scope_1_emissions": 7122248.8339861,
+  "scope_2_location_based_emissions": 0,
+  "scope_3_emissions": 0,
+  "total_emission_location": 15524035.3274066,
+  "scope_2_market_based_emissions": 0,
+  "total_emission_market": 15616556.91177661,
+  "flags": {
+    "has_scope_1": true,
+    "has_scope_2_location": false,
+    "has_scope_2_market": false,
+    "has_scope_3": false,
+    "has_scope_3_category_1": true,
+    "has_scope_3_category_2": false,
+    "has_scope_3_category_3": true,
+    "has_scope_3_category_4": false,
+    "has_scope_3_category_5": false,
+    "has_scope_3_category_6": false,
+    "has_scope_3_category_7": false,
+    "has_scope_3_category_8": false,
+    "has_scope_3_category_9": false,
+    "has_scope_3_category_10": false,
+    "has_scope_3_category_11": false,
+    "has_scope_3_category_12": false,
+    "has_scope_3_category_13": false,
+    "has_scope_3_category_14": false,
+    "has_scope_3_category_15": false
+  },
+  "scope_1": 7122248.8339861,
+  "scope_2_location": 1069378.747982,
+  "scope_2_market": 1161900.332352,
+  "scope_3": 7332407.74543851,
+  "scope1_items": [
+    {
+      "name": "固定燃烧",
+      "number": "1",
+      "emission_source": "天然气燃烧",
+      "facility": "热处理炉（加热炉）"
+    },
+    {
+      "name": "固定燃烧",
+      "number": "2",
+      "emission_source": "液化石油气燃烧",
+      "facility": "冶钢宾馆"
+    },
+    {
+      "name": "固定燃烧",
+      "number": "3",
+      "emission_source": "烟煤燃烧",
+      "facility": "高炉"
+    },
+    {
+      "name": "固定燃烧",
+      "number": "4",
+      "emission_source": "无烟煤燃烧",
+      "facility": "高炉、烧结"
+    },
+    {
+      "name": "固定燃烧",
+      "number": "5",
+      "emission_source": "洗精煤燃烧",
+      "facility": "焦炉"
+    },
+    {
+      "name": "固定燃烧",
+      "number": "6",
+      "emission_source": "焦炭燃烧",
+      "facility": "高炉"
+    },
+    {
+      "name": "固定燃烧",
+      "number": "7",
+      "emission_source": "焦屑燃烧",
+      "facility": "烧结、高炉"
+    },
+    {
+      "name": "固定燃烧",
+      "number": "8",
+      "emission_source": "焦炉煤气燃烧",
+      "facility": "外售"
+    },
+    {
+      "name": "移动燃烧",
+      "number": "9",
+      "emission_source": "0#柴油燃烧",
+      "facility": "场内运输"
+    },
+    {
+      "name": "移动燃烧",
+      "number": "10",
+      "emission_source": "92#汽油燃烧",
+      "facility": "公务车"
+    },
+    {
+      "name": "逸散排放",
+      "number": "11",
+      "emission_source": "制冷剂逸散（R32）",
+      "facility": "分体式空调"
+    },
+    {
+      "name": "逸散排放",
+      "number": "12",
+      "emission_source": "CO2逸散",
+      "facility": "二氧化碳灭火器"
+    },
+    {
+      "name": "逸散排放",
+      "number": "13",
+      "emission_source": "CH4逸散",
+      "facility": "化粪池"
+    },
+    {
+      "name": "逸散排放",
+      "number": "14",
+      "emission_source": "CH4逸散",
+      "facility": "耗氧池"
+    },
+    {
+      "name": "逸散排放",
+      "number": "15",
+      "emission_source": "SF6逸散",
+      "facility": "高压开关"
+    },
+    {
+      "name": "制程排放",
+      "number": "16",
+      "emission_source": "石灰石",
+      "facility": "石灰窑"
+    },
+    {
+      "name": "制程排放",
+      "number": "17",
+      "emission_source": "白云石",
+      "facility": "高炉"
+    },
+    {
+      "name": "制程排放",
+      "number": "18",
+      "emission_source": "电极",
+      "facility": "炼钢"
+    },
+    {
+      "name": "制程排放",
+      "number": "19",
+      "emission_source": "废钢",
+      "facility": "炼钢"
+    },
+    {
+      "name": "制程排放",
+      "number": "20",
+      "emission_source": "锰铁",
+      "facility": "炼钢"
+    },
+    {
+      "name": "制程排放",
+      "number": "21",
+      "emission_source": "镍铁",
+      "facility": "炼钢"
+    },
+    {
+      "name": "制程排放",
+      "number": "22",
+      "emission_source": "铬铁",
+      "facility": "炼钢"
+    },
+    {
+      "name": "制程排放",
+      "number": "23",
+      "emission_source": "硅铁",
+      "facility": "炼钢"
+    },
+    {
+      "name": "制程排放",
+      "number": "24",
+      "emission_source": "钼铁",
+      "facility": "炼钢"
+    },
+    {
+      "name": "制程排放",
+      "number": "25",
+      "emission_source": "钢坯",
+      "facility": "固碳产品"
+    },
+    {
+      "name": "制程排放",
+      "number": "26",
+      "emission_source": "粗苯",
+      "facility": "外售"
+    },
+    {
+      "name": "制程排放",
+      "number": "27",
+      "emission_source": "煤焦油",
+      "facility": "危废处置"
+    }
+  ],
+  "scope2_3_items": [
+    {
+      "name": "输入能源间接温室气体排放",
+      "number": "28",
+      "emission_source": "外购电力（基于位置）",
+      "facility": "用电设备"
+    },
+    {
+      "name": "输入能源间接温室气体排放",
+      "number": "29",
+      "emission_source": "外购电力（基于市场）",
+      "facility": "用电设备"
+    },
+    {
+      "name": "外购商品和服务的上游排放",
+      "number": "30",
+      "emission_source": "铁矿石生产",
+      "facility": "烧结"
+    },
+    {
+      "name": "外购商品和服务的上游排放",
+      "number": "31",
+      "emission_source": "生石灰生产",
+      "facility": "烧结、转炉、电炉"
+    },
+    {
+      "name": "外购商品和服务的上游排放",
+      "number": "32",
+      "emission_source": "石灰石生产",
+      "facility": "转炉"
+    },
+    {
+      "name": "外购商品和服务的上游排放",
+      "number": "33",
+      "emission_source": "白云石生产",
+      "facility": "烧结、转炉、电炉"
+    },
+    {
+      "name": "外购商品和服务的上游排放",
+      "number": "34",
+      "emission_source": "轻烧白云石生产",
+      "facility": "转炉、电炉"
+    },
+    {
+      "name": "外购商品和服务的上游排放",
+      "number": "35",
+      "emission_source": "球团生产",
+      "facility": "高炉、转炉"
+    },
+    {
+      "name": "外购商品和服务的上游排放",
+      "number": "36",
+      "emission_source": "废钢生产",
+      "facility": "转炉、电炉"
+    },
+    {
+      "name": "外购商品和服务的上游排放",
+      "number": "37",
+      "emission_source": "电极生产",
+      "facility": "转炉、电炉"
+    },
+    {
+      "name": "外购商品和服务的上游排放",
+      "number": "38",
+      "emission_source": "锰铁生产",
+      "facility": "转炉、电炉"
+    },
+    {
+      "name": "外购商品和服务的上游排放",
+      "number": "39",
+      "emission_source": "镍铁生产",
+      "facility": "转炉、电炉"
+    },
+    {
+      "name": "外购商品和服务的上游排放",
+      "number": "40",
+      "emission_source": "铬铁生产",
+      "facility": "转炉、电炉"
+    },
+    {
+      "name": "外购商品和服务的上游排放",
+      "number": "41",
+      "emission_source": "萤石生产",
+      "facility": "转炉、电炉"
+    },
+    {
+      "name": "外购商品和服务的上游排放",
+      "number": "42",
+      "emission_source": "硅铁生产",
+      "facility": "转炉、电炉"
+    },
+    {
+      "name": "外购商品和服务的上游排放",
+      "number": "43",
+      "emission_source": "钼铁生产",
+      "facility": "转炉、电炉"
+    },
+    {
+      "name": "外购商品和服务的上游排放",
+      "number": "44",
+      "emission_source": "铝铁生产",
+      "facility": "转炉、电炉"
+    },
+    {
+      "name": "外购商品和服务的上游排放",
+      "number": "45",
+      "emission_source": "铝生产",
+      "facility": "转炉、电炉"
+    },
+    {
+      "name": "外购商品和服务的上游排放",
+      "number": "46",
+      "emission_source": "增碳剂生产",
+      "facility": "转炉、电炉"
+    },
+    {
+      "name": "外购商品和服务的上游排放",
+      "number": "47",
+      "emission_source": "铁鳞生产",
+      "facility": "炼钢"
+    },
+    {
+      "name": "外购商品和服务的上游排放",
+      "number": "48",
+      "emission_source": "氨水生产",
+      "facility": "烧结"
+    },
+    {
+      "name": "外购商品和服务的上游排放",
+      "number": "49",
+      "emission_source": "碳化硅生产",
+      "facility": "-"
+    },
+    {
+      "name": "外购商品和服务的上游排放",
+      "number": "50",
+      "emission_source": "镁生产",
+      "facility": "-"
+    },
+    {
+      "name": "外购商品和服务的上游排放",
+      "number": "51",
+      "emission_source": "所有其他纸制品加工制造",
+      "facility": "办公室"
+    },
+    {
+      "name": "外购商品和服务的上游排放",
+      "number": "52",
+      "emission_source": "办公用品(纸张除外)制造",
+      "facility": "办公室"
+    },
+    {
+      "name": "外购商品和服务的上游排放",
+      "number": "53",
+      "emission_source": "源水",
+      "facility": "水处理工序"
+    },
+    {
+      "name": "资本货物",
+      "number": "54",
+      "emission_source": "采购产品空调和暖空气加热设备和商业和工业制冷设备制造",
+      "facility": "办公室、各工序"
+    },
+    {
+      "name": "资本货物",
+      "number": "55",
+      "emission_source": "电子计算机制造",
+      "facility": "办公室、各工序"
+    },
+    {
+      "name": "资本货物",
+      "number": "56",
+      "emission_source": "焊接及焊接设备制造",
+      "facility": "各工序"
+    },
+    {
+      "name": "资本货物",
+      "number": "57",
+      "emission_source": "其他工业设备制造",
+      "facility": "各工序"
+    },
+    {
+      "name": "资本货物",
+      "number": "58",
+      "emission_source": "测量和测试电力和电气信号的仪器制造",
+      "facility": "各工序"
+    },
+    {
+      "name": "资本货物",
+      "number": "59",
+      "emission_source": "计算机系统设计服务",
+      "facility": "各工序"
+    },
+    {
+      "name": "资本货物",
+      "number": "60",
+      "emission_source": "机械动力传动设备制造",
+      "facility": "各工序"
+    },
+    {
+      "name": "资本货物",
+      "number": "61",
+      "emission_source": "测量、分配及其他泵类设备制造",
+      "facility": "各工序"
+    },
+    {
+      "name": "资本货物",
+      "number": "62",
+      "emission_source": "用于测量、显示和控制工业过程变量的仪器及相关产品制造",
+      "facility": "各工序"
+    },
+    {
+      "name": "资本货物",
+      "number": "63",
+      "emission_source": "所有其他杂项电气设备及元件制造",
+      "facility": "各工序"
+    },
+    {
+      "name": "资本货物",
+      "number": "64",
+      "emission_source": "所有其他杂项制造",
+      "facility": "各工序"
+    },
+    {
+      "name": "范围一、二相关燃料和能源相关的活动产生的排放",
+      "number": "65",
+      "emission_source": "液化石油气生产",
+      "facility": "冶钢宾馆"
+    },
+    {
+      "name": "范围一、二相关燃料和能源相关的活动产生的排放",
+      "number": "66",
+      "emission_source": "洗精煤生产",
+      "facility": "焦化"
+    },
+    {
+      "name": "范围一、二相关燃料和能源相关的活动产生的排放",
+      "number": "67",
+      "emission_source": "柴油生产",
+      "facility": "各工序"
+    },
+    {
+      "name": "范围一、二相关燃料和能源相关的活动产生的排放",
+      "number": "68",
+      "emission_source": "汽油生产",
+      "facility": "车队"
+    },
+    {
+      "name": "范围一、二相关燃料和能源相关的活动产生的排放",
+      "number": "69",
+      "emission_source": "焦炭生产",
+      "facility": "烧结、高炉"
+    },
+    {
+      "name": "范围一、二相关燃料和能源相关的活动产生的排放",
+      "number": "70",
+      "emission_source": "焦屑生产",
+      "facility": "烧结、高炉"
+    },
+    {
+      "name": "范围一、二相关燃料和能源相关的活动产生的排放",
+      "number": "71",
+      "emission_source": "烟煤生产",
+      "facility": "高炉"
+    },
+    {
+      "name": "范围一、二相关燃料和能源相关的活动产生的排放",
+      "number": "72",
+      "emission_source": "无烟煤生产",
+      "facility": "烧结、高炉"
+    },
+    {
+      "name": "范围一、二相关燃料和能源相关的活动产生的排放",
+      "number": "73",
+      "emission_source": "天然气生产",
+      "facility": "转炉、电炉、锻造、热处理"
+    },
+    {
+      "name": "范围一、二相关燃料和能源相关的活动产生的排放",
+      "number": "74",
+      "emission_source": "外购电力上游排放",
+      "facility": "各工序"
+    },
+    {
+      "name": "上游运输配送产生的排放",
+      "number": "75",
+      "emission_source": "船运",
+      "facility": "-"
+    },
+    {
+      "name": "上游运输配送产生的排放",
+      "number": "76",
+      "emission_source": "汽运",
+      "facility": "-"
+    },
+    {
+      "name": "上游运输配送产生的排放",
+      "number": "77",
+      "emission_source": "铁路运输",
+      "facility": "-"
+    },
+    {
+      "name": "运营中产生的废物排放",
+      "number": "78",
+      "emission_source": "生活垃圾和厨余垃圾",
+      "facility": "垃圾站"
+    },
+    {
+      "name": "运营中产生的废物排放",
+      "number": "79",
+      "emission_source": "废油",
+      "facility": "-"
+    },
+    {
+      "name": "运营中产生的废物排放",
+      "number": "80",
+      "emission_source": "废油水",
+      "facility": "-"
+    },
+    {
+      "name": "运营中产生的废物排放",
+      "number": "81",
+      "emission_source": "煤焦油",
+      "facility": "-"
+    },
+    {
+      "name": "运营中产生的废物排放",
+      "number": "82",
+      "emission_source": "废弃物运输",
+      "facility": "-"
+    },
+    {
+      "name": "商务旅行产生的排放",
+      "number": "83",
+      "emission_source": "航运",
+      "facility": "-"
+    },
+    {
+      "name": "商务旅行产生的排放",
+      "number": "84",
+      "emission_source": "铁路运输",
+      "facility": "-"
+    },
+    {
+      "name": "商务旅行产生的排放",
+      "number": "85",
+      "emission_source": "员工差旅住宿",
+      "facility": "-"
+    },
+    {
+      "name": "员工通勤产生的排放",
+      "number": "86",
+      "emission_source": "通勤车",
+      "facility": "-"
+    },
+    {
+      "name": "员工通勤产生的排放",
+      "number": "87",
+      "emission_source": "电动车",
+      "facility": "-"
+    },
+    {
+      "name": "员工通勤产生的排放",
+      "number": "88",
+      "emission_source": "自驾油车",
+      "facility": "-"
+    },
+    {
+      "name": "员工通勤产生的排放",
+      "number": "89",
+      "emission_source": "自驾电车",
+      "facility": "-"
+    },
+    {
+      "name": "下游运输配送产生的排放",
+      "number": "90",
+      "emission_source": "船运",
+      "facility": "-"
+    },
+    {
+      "name": "下游运输配送产生的排放",
+      "number": "91",
+      "emission_source": "汽运",
+      "facility": "-"
+    },
+    {
+      "name": "下游运输配送产生的排放",
+      "number": "92",
+      "emission_source": "铁路运输",
+      "facility": "-"
+    },
+    {
+      "name": "下游运输配送产生的排放",
+      "number": "93",
+      "emission_source": "汽运-副产品",
+      "facility": "-"
+    },
+    {
+      "name": "外销产品加工产生的排放",
+      "number": "94",
+      "emission_source": "锻材加工",
+      "facility": "下游钢铁厂"
+    },
+    {
+      "name": "外销产品加工产生的排放",
+      "number": "95",
+      "emission_source": "棒材加工",
+      "facility": "下游钢铁厂"
+    },
+    {
+      "name": "外销产品加工产生的排放",
+      "number": "96",
+      "emission_source": "钢管加工",
+      "facility": "下游钢铁厂"
+    },
+    {
+      "name": "外销产品加工产生的排放",
+      "number": "97",
+      "emission_source": "钢坯加工",
+      "facility": "下游钢铁厂"
+    },
+    {
+      "name": "外销产品使用产生的排放",
+      "number": "98",
+      "emission_source": "外售焦炉煤气燃烧",
+      "facility": "下游钢铁厂"
+    },
+    {
+      "name": "外售产品报废产生的排放",
+      "number": "99",
+      "emission_source": "产品报废",
+      "facility": "下游钢铁厂"
+    }
+  ],
+  "scope1_stationary_combustion_emissions_items": [
+    {
+      "name": "1.1.1",
+      "number": "1.1.1",
+      "emission_source": "天然气燃烧",
+      "facility": "热处理炉（加热炉）",
+      "note": "",
+      "total_green_house_gas_emissions": "38881.73",
+      "CO2_emissions": "38843.51",
+      "CH4_emissions": "19.32",
+      "N2O_emissions": "18.90",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "name": "1.1.2",
+      "number": "1.1.2",
+      "emission_source": "液化石油气燃烧",
+      "facility": "冶钢宾馆",
+      "note": "",
+      "total_green_house_gas_emissions": "29.16",
+      "CO2_emissions": "29.14",
+      "CH4_emissions": "0.01",
+      "N2O_emissions": "0.01",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "name": "1.1.3",
+      "number": "1.1.3",
+      "emission_source": "烟煤燃烧",
+      "facility": "高炉",
+      "note": "",
+      "total_green_house_gas_emissions": "925941.32",
+      "CO2_emissions": "921839.46",
+      "CH4_emissions": "261.64",
+      "N2O_emissions": "3840.22",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "name": "1.1.4",
+      "number": "1.1.4",
+      "emission_source": "无烟煤燃烧",
+      "facility": "高炉、烧结",
+      "note": "",
+      "total_green_house_gas_emissions": "637282.39",
+      "CO2_emissions": "634459.27",
+      "CH4_emissions": "180.08",
+      "N2O_emissions": "2643.04",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "name": "1.1.5",
+      "number": "1.1.5",
+      "emission_source": "洗精煤燃烧",
+      "facility": "焦炉",
+      "note": "",
+      "total_green_house_gas_emissions": "4824841.57",
+      "CO2_emissions": "4802635.73",
+      "CH4_emissions": "1416.42",
+      "N2O_emissions": "20789.42",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "name": "1.1.6",
+      "number": "1.1.6",
+      "emission_source": "焦炭燃烧",
+      "facility": "高炉",
+      "note": "",
+      "total_green_house_gas_emissions": "439843.84",
+      "CO2_emissions": "438053.15",
+      "CH4_emissions": "114.22",
+      "N2O_emissions": "1676.47",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "name": "1.1.7",
+      "number": "1.1.7",
+      "emission_source": "焦屑燃烧",
+      "facility": "烧结、高炉",
+      "note": "",
+      "total_green_house_gas_emissions": "364657.36",
+      "CO2_emissions": "363172.76",
+      "CH4_emissions": "94.70",
+      "N2O_emissions": "1389.90",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "name": "1.1.8",
+      "number": "1.1.8",
+      "emission_source": "焦炉煤气燃烧",
+      "facility": "外售",
+      "note": "",
+      "total_green_house_gas_emissions": "-3833.14",
+      "CO2_emissions": "-3828.38",
+      "CH4_emissions": "-2.41",
+      "N2O_emissions": "-2.35",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    }
+  ],
+  "scope1_mobile_combustion_emissions_items": [
+    {
+      "name": "1.2.1",
+      "number": "1.2.1",
+      "emission_source": "0#柴油燃烧",
+      "facility": "场内运输",
+      "note": "",
+      "total_green_house_gas_emissions": "4417.07",
+      "CO2_emissions": "4348.21",
+      "CH4_emissions": "6.39",
+      "N2O_emissions": "62.48",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "name": "1.2.2",
+      "number": "1.2.2",
+      "emission_source": "92#汽油燃烧",
+      "facility": "公务车",
+      "note": "",
+      "total_green_house_gas_emissions": "149.47",
+      "CO2_emissions": "143.50",
+      "CH4_emissions": "1.44",
+      "N2O_emissions": "4.52",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    }
+  ],
+  "scope1_fugitive_emissions_items": [
+    {
+      "name": "1.3.1",
+      "number": "1.3.1",
+      "emission_source": "制冷剂逸散（R32）",
+      "facility": "分体式空调",
+      "note": "",
+      "total_green_house_gas_emissions": "717.03",
+      "CO2_emissions": "0.00",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "717.03",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "name": "1.3.2",
+      "number": "1.3.2",
+      "emission_source": "CO2逸散",
+      "facility": "二氧化碳灭火器",
+      "note": "",
+      "total_green_house_gas_emissions": "0.66",
+      "CO2_emissions": "0.66",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "name": "1.3.3",
+      "number": "1.3.3",
+      "emission_source": "CH4逸散",
+      "facility": "化粪池",
+      "note": "",
+      "total_green_house_gas_emissions": "112.29",
+      "CO2_emissions": "0.00",
+      "CH4_emissions": "112.29",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "name": "1.3.4",
+      "number": "1.3.4",
+      "emission_source": "CH4逸散",
+      "facility": "耗氧池",
+      "note": "",
+      "total_green_house_gas_emissions": "365.58",
+      "CO2_emissions": "0.00",
+      "CH4_emissions": "365.58",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "name": "1.3.5",
+      "number": "1.3.5",
+      "emission_source": "SF6逸散",
+      "facility": "高压开关",
+      "note": "",
+      "total_green_house_gas_emissions": "2459.16",
+      "CO2_emissions": "0.00",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "2459.16",
+      "NF3_emissions": "0.00"
+    }
+  ],
+  "scope1_process_emissions_items": [
+    {
+      "name": "1.4.1",
+      "number": "1.4.1",
+      "emission_source": "石灰石",
+      "facility": "石灰窑",
+      "note": "",
+      "total_green_house_gas_emissions": "8520.94",
+      "CO2_emissions": "8520.94",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "name": "1.4.2",
+      "number": "1.4.2",
+      "emission_source": "白云石",
+      "facility": "高炉",
+      "note": "",
+      "total_green_house_gas_emissions": "169593.75",
+      "CO2_emissions": "169593.75",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "name": "1.4.3",
+      "number": "1.4.3",
+      "emission_source": "电极",
+      "facility": "炼钢",
+      "note": "",
+      "total_green_house_gas_emissions": "17447.13",
+      "CO2_emissions": "17447.13",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "name": "1.4.4",
+      "number": "1.4.4",
+      "emission_source": "废钢",
+      "facility": "炼钢",
+      "note": "",
+      "total_green_house_gas_emissions": "39875.74",
+      "CO2_emissions": "39875.74",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "name": "1.4.5",
+      "number": "1.4.5",
+      "emission_source": "锰铁",
+      "facility": "炼钢",
+      "note": "",
+      "total_green_house_gas_emissions": "13114.10",
+      "CO2_emissions": "13114.10",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "name": "1.4.6",
+      "number": "1.4.6",
+      "emission_source": "镍铁",
+      "facility": "炼钢",
+      "note": "",
+      "total_green_house_gas_emissions": "349.47",
+      "CO2_emissions": "349.47",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "name": "1.4.7",
+      "number": "1.4.7",
+      "emission_source": "铬铁",
+      "facility": "炼钢",
+      "note": "",
+      "total_green_house_gas_emissions": "22918.91",
+      "CO2_emissions": "22918.91",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "name": "1.4.8",
+      "number": "1.4.8",
+      "emission_source": "硅铁",
+      "facility": "炼钢",
+      "note": "",
+      "total_green_house_gas_emissions": "74.71",
+      "CO2_emissions": "74.71",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "name": "1.4.9",
+      "number": "1.4.9",
+      "emission_source": "钼铁",
+      "facility": "炼钢",
+      "note": "",
+      "total_green_house_gas_emissions": "143.01",
+      "CO2_emissions": "143.01",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "name": "1.4.10",
+      "number": "1.4.10",
+      "emission_source": "钢坯",
+      "facility": "固碳产品",
+      "note": "",
+      "total_green_house_gas_emissions": "-160314.41",
+      "CO2_emissions": "-160314.41",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "name": "1.4.11",
+      "number": "1.4.11",
+      "emission_source": "粗苯",
+      "facility": "外售",
+      "note": "",
+      "total_green_house_gas_emissions": "-65952.99",
+      "CO2_emissions": "-65952.99",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "name": "1.4.12",
+      "number": "1.4.12",
+      "emission_source": "煤焦油",
+      "facility": "危废处置",
+      "note": "",
+      "total_green_house_gas_emissions": "-159387.02",
+      "CO2_emissions": "-159387.02",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    }
+  ],
+  "scope1_stationary_combustion_emissions_total_green_house_gas_emissions_sum_formatted": "7227644.23",
+  "scope1_stationary_combustion_emissions_CO2_emissions_sum_formatted": "7195204.64",
+  "scope1_stationary_combustion_emissions_CH4_emissions_sum_formatted": "2083.98",
+  "scope1_stationary_combustion_emissions_N2O_emissions_sum_formatted": "30355.61",
+  "scope1_stationary_combustion_emissions_HFCs_emissions_sum_formatted": "0.00",
+  "scope1_stationary_combustion_emissions_PFCs_emissions_sum_formatted": "0.00",
+  "scope1_stationary_combustion_emissions_SFs_emissions_sum_formatted": "0.00",
+  "scope1_stationary_combustion_emissions_NF3_emissions_sum_formatted": "0.00",
+  "scope1_mobile_combustion_emissions_total_green_house_gas_emissions_sum_formatted": "4566.54",
+  "scope1_mobile_combustion_emissions_CO2_emissions_sum_formatted": "4491.71",
+  "scope1_mobile_combustion_emissions_CH4_emissions_sum_formatted": "7.83",
+  "scope1_mobile_combustion_emissions_N2O_emissions_sum_formatted": "67.00",
+  "scope1_mobile_combustion_emissions_HFCs_emissions_sum_formatted": "0.00",
+  "scope1_mobile_combustion_emissions_PFCs_emissions_sum_formatted": "0.00",
+  "scope1_mobile_combustion_emissions_SFs_emissions_sum_formatted": "0.00",
+  "scope1_mobile_combustion_emissions_NF3_emissions_sum_formatted": "0.00",
+  "scope1_fugitive_emissions_total_green_house_gas_emissions_sum_formatted": "3654.72",
+  "scope1_fugitive_emissions_CO2_emissions_sum_formatted": "0.66",
+  "scope1_fugitive_emissions_CH4_emissions_sum_formatted": "477.87",
+  "scope1_fugitive_emissions_N2O_emissions_sum_formatted": "0.00",
+  "scope1_fugitive_emissions_HFCs_emissions_sum_formatted": "717.03",
+  "scope1_fugitive_emissions_PFCs_emissions_sum_formatted": "0.00",
+  "scope1_fugitive_emissions_SFs_emissions_sum_formatted": "2459.16",
+  "scope1_fugitive_emissions_NF3_emissions_sum_formatted": "0.00",
+  "scope1_process_emissions_total_green_house_gas_emissions_sum_formatted": "-113616.66",
+  "scope1_process_emissions_CO2_emissions_sum_formatted": "-113616.66",
+  "scope1_process_emissions_CH4_emissions_sum_formatted": "0.00",
+  "scope1_process_emissions_N2O_emissions_sum_formatted": "0.00",
+  "scope1_process_emissions_HFCs_emissions_sum_formatted": "0.00",
+  "scope1_process_emissions_PFCs_emissions_sum_formatted": "0.00",
+  "scope1_process_emissions_SFs_emissions_sum_formatted": "0.00",
+  "scope1_process_emissions_NF3_emissions_sum_formatted": "0.00",
+  "scope1_emissions_total_green_house_gas_emissions_sum_formatted": "7122248.83",
+  "scope1_emissions_CO2_emissions_sum_formatted": "7086080.35",
+  "scope1_emissions_CH4_emissions_sum_formatted": "2569.68",
+  "scope1_emissions_N2O_emissions_sum_formatted": "30422.61",
+  "scope1_emissions_HFCs_emissions_sum_formatted": "717.03",
+  "scope1_emissions_PFCs_emissions_sum_formatted": "0.00",
+  "scope1_emissions_SFs_emissions_sum_formatted": "2459.16",
+  "scope1_emissions_NF3_emissions_sum_formatted": "0.00",
+  "scope2_items": [
+    {
+      "number": "2.1",
+      "emission_source": "外购电力（基于位置）",
+      "total_green_house_gas_emissions": "1,069,378.75",
+      "CO2_emissions": "1,069,378.75",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "2.2",
+      "emission_source": "外购电力（基于市场）",
+      "total_green_house_gas_emissions": "1,161,900.33",
+      "CO2_emissions": "1,161,900.33",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    }
+  ],
+  "scope3_category1": [
+    {
+      "number": "3.1.1",
+      "emission_source": "铁矿石生产",
+      "total_green_house_gas_emissions": "448,588.58",
+      "CO2_emissions": "448,588.58",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.2",
+      "emission_source": "生石灰生产",
+      "total_green_house_gas_emissions": "727,500.38",
+      "CO2_emissions": "727,500.38",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.3",
+      "emission_source": "石灰石生产",
+      "total_green_house_gas_emissions": "58.68",
+      "CO2_emissions": "58.68",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.4",
+      "emission_source": "白云石生产",
+      "total_green_house_gas_emissions": "46,435.20",
+      "CO2_emissions": "46,435.20",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.5",
+      "emission_source": "轻烧白云石生产",
+      "total_green_house_gas_emissions": "363.21",
+      "CO2_emissions": "363.21",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.6",
+      "emission_source": "球团生产",
+      "total_green_house_gas_emissions": "71,601.05",
+      "CO2_emissions": "71,601.05",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.7",
+      "emission_source": "废钢生产",
+      "total_green_house_gas_emissions": "79,944.39",
+      "CO2_emissions": "79,944.39",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.8",
+      "emission_source": "电极生产",
+      "total_green_house_gas_emissions": "37,742.81",
+      "CO2_emissions": "37,742.81",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.9",
+      "emission_source": "锰铁生产",
+      "total_green_house_gas_emissions": "141,868.58",
+      "CO2_emissions": "141,868.58",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.10",
+      "emission_source": "镍铁生产",
+      "total_green_house_gas_emissions": "84,819.12",
+      "CO2_emissions": "84,819.12",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.11",
+      "emission_source": "铬铁生产",
+      "total_green_house_gas_emissions": "345,101.44",
+      "CO2_emissions": "345,101.44",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.12",
+      "emission_source": "萤石生产",
+      "total_green_house_gas_emissions": "685.06",
+      "CO2_emissions": "685.06",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.13",
+      "emission_source": "硅铁生产",
+      "total_green_house_gas_emissions": "103,575.78",
+      "CO2_emissions": "103,575.78",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.14",
+      "emission_source": "钼铁生产",
+      "total_green_house_gas_emissions": "66,065.40",
+      "CO2_emissions": "66,065.40",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.15",
+      "emission_source": "铝铁生产",
+      "total_green_house_gas_emissions": "63,158.19",
+      "CO2_emissions": "63,158.19",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.16",
+      "emission_source": "铝生产",
+      "total_green_house_gas_emissions": "63,342.20",
+      "CO2_emissions": "63,342.20",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.17",
+      "emission_source": "增碳剂生产",
+      "total_green_house_gas_emissions": "17,778.32",
+      "CO2_emissions": "17,778.32",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.18",
+      "emission_source": "铁鳞生产",
+      "total_green_house_gas_emissions": "608.38",
+      "CO2_emissions": "608.38",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.19",
+      "emission_source": "氨水生产",
+      "total_green_house_gas_emissions": "24,444.82",
+      "CO2_emissions": "24,444.82",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.20",
+      "emission_source": "碳化硅生产",
+      "total_green_house_gas_emissions": "48,149.59",
+      "CO2_emissions": "48,149.59",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.21",
+      "emission_source": "镁生产",
+      "total_green_house_gas_emissions": "308,520.83",
+      "CO2_emissions": "308,520.83",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.22",
+      "emission_source": "所有其他纸制品加工制造",
+      "total_green_house_gas_emissions": "5.54",
+      "CO2_emissions": "5.54",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.23",
+      "emission_source": "办公用品(纸张除外)制造",
+      "total_green_house_gas_emissions": "47.03",
+      "CO2_emissions": "47.03",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.24",
+      "emission_source": "源水",
+      "total_green_house_gas_emissions": "29,761.03",
+      "CO2_emissions": "29,761.03",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    }
+  ],
+  "scope3_category2": [],
+  "scope3_category3": [
+    {
+      "number": "3.3.1",
+      "emission_source": "液化石油气生产",
+      "total_green_house_gas_emissions": "9.45",
+      "CO2_emissions": "9.45",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.3.2",
+      "emission_source": "洗精煤生产",
+      "total_green_house_gas_emissions": "1,120,352.42",
+      "CO2_emissions": "1,120,352.42",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.3.3",
+      "emission_source": "柴油生产",
+      "total_green_house_gas_emissions": "1,182.23",
+      "CO2_emissions": "1,182.23",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.3.4",
+      "emission_source": "汽油生产",
+      "total_green_house_gas_emissions": "48.44",
+      "CO2_emissions": "48.44",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.3.5",
+      "emission_source": "焦炭生产",
+      "total_green_house_gas_emissions": "184,347.32",
+      "CO2_emissions": "184,347.32",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.3.6",
+      "emission_source": "焦屑生产",
+      "total_green_house_gas_emissions": "152,835.17",
+      "CO2_emissions": "152,835.17",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.3.7",
+      "emission_source": "烟煤生产",
+      "total_green_house_gas_emissions": "229,690.01",
+      "CO2_emissions": "229,690.01",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.3.8",
+      "emission_source": "无烟煤生产",
+      "total_green_house_gas_emissions": "149,948.24",
+      "CO2_emissions": "149,948.24",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.3.9",
+      "emission_source": "天然气生产",
+      "total_green_house_gas_emissions": "11,120.27",
+      "CO2_emissions": "11,120.27",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.3.10",
+      "emission_source": "外购电力上游排放",
+      "total_green_house_gas_emissions": "167,202.53",
+      "CO2_emissions": "167,202.53",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    }
+  ],
+  "scope3_category4": [],
+  "scope3_category5": [],
+  "scope3_category6": [],
+  "scope3_category7": [],
+  "scope3_category9": [],
+  "scope3_category10": [],
+  "scope3_category11": [],
+  "scope3_category12": [],
+  "scope3_items": [
+    {
+      "number": "3.1.1",
+      "emission_source": "铁矿石生产",
+      "total_green_house_gas_emissions": "448,588.58",
+      "CO2_emissions": "448,588.58",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.2",
+      "emission_source": "生石灰生产",
+      "total_green_house_gas_emissions": "727,500.38",
+      "CO2_emissions": "727,500.38",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.3",
+      "emission_source": "石灰石生产",
+      "total_green_house_gas_emissions": "58.68",
+      "CO2_emissions": "58.68",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.4",
+      "emission_source": "白云石生产",
+      "total_green_house_gas_emissions": "46,435.20",
+      "CO2_emissions": "46,435.20",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.5",
+      "emission_source": "轻烧白云石生产",
+      "total_green_house_gas_emissions": "363.21",
+      "CO2_emissions": "363.21",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.6",
+      "emission_source": "球团生产",
+      "total_green_house_gas_emissions": "71,601.05",
+      "CO2_emissions": "71,601.05",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.7",
+      "emission_source": "废钢生产",
+      "total_green_house_gas_emissions": "79,944.39",
+      "CO2_emissions": "79,944.39",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.8",
+      "emission_source": "电极生产",
+      "total_green_house_gas_emissions": "37,742.81",
+      "CO2_emissions": "37,742.81",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.9",
+      "emission_source": "锰铁生产",
+      "total_green_house_gas_emissions": "141,868.58",
+      "CO2_emissions": "141,868.58",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.10",
+      "emission_source": "镍铁生产",
+      "total_green_house_gas_emissions": "84,819.12",
+      "CO2_emissions": "84,819.12",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.11",
+      "emission_source": "铬铁生产",
+      "total_green_house_gas_emissions": "345,101.44",
+      "CO2_emissions": "345,101.44",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.12",
+      "emission_source": "萤石生产",
+      "total_green_house_gas_emissions": "685.06",
+      "CO2_emissions": "685.06",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.13",
+      "emission_source": "硅铁生产",
+      "total_green_house_gas_emissions": "103,575.78",
+      "CO2_emissions": "103,575.78",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.14",
+      "emission_source": "钼铁生产",
+      "total_green_house_gas_emissions": "66,065.40",
+      "CO2_emissions": "66,065.40",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.15",
+      "emission_source": "铝铁生产",
+      "total_green_house_gas_emissions": "63,158.19",
+      "CO2_emissions": "63,158.19",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.16",
+      "emission_source": "铝生产",
+      "total_green_house_gas_emissions": "63,342.20",
+      "CO2_emissions": "63,342.20",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.17",
+      "emission_source": "增碳剂生产",
+      "total_green_house_gas_emissions": "17,778.32",
+      "CO2_emissions": "17,778.32",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.18",
+      "emission_source": "铁鳞生产",
+      "total_green_house_gas_emissions": "608.38",
+      "CO2_emissions": "608.38",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.19",
+      "emission_source": "氨水生产",
+      "total_green_house_gas_emissions": "24,444.82",
+      "CO2_emissions": "24,444.82",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.20",
+      "emission_source": "碳化硅生产",
+      "total_green_house_gas_emissions": "48,149.59",
+      "CO2_emissions": "48,149.59",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.21",
+      "emission_source": "镁生产",
+      "total_green_house_gas_emissions": "308,520.83",
+      "CO2_emissions": "308,520.83",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.22",
+      "emission_source": "所有其他纸制品加工制造",
+      "total_green_house_gas_emissions": "5.54",
+      "CO2_emissions": "5.54",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.23",
+      "emission_source": "办公用品(纸张除外)制造",
+      "total_green_house_gas_emissions": "47.03",
+      "CO2_emissions": "47.03",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.1.24",
+      "emission_source": "源水",
+      "total_green_house_gas_emissions": "29,761.03",
+      "CO2_emissions": "29,761.03",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.2.1",
+      "emission_source": "采购产品空调和暖空气加热设备和商业和工业制冷设备制造",
+      "total_green_house_gas_emissions": "14.83",
+      "CO2_emissions": "14.83",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.2.2",
+      "emission_source": "电子计算机制造",
+      "total_green_house_gas_emissions": "3.79",
+      "CO2_emissions": "3.79",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.2.3",
+      "emission_source": "焊接及焊接设备制造",
+      "total_green_house_gas_emissions": "216.41",
+      "CO2_emissions": "216.41",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.2.4",
+      "emission_source": "其他工业设备制造",
+      "total_green_house_gas_emissions": "1,153.47",
+      "CO2_emissions": "1,153.47",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.2.5",
+      "emission_source": "测量和测试电力和电气信号的仪器制造",
+      "total_green_house_gas_emissions": "44.32",
+      "CO2_emissions": "44.32",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.2.6",
+      "emission_source": "计算机系统设计服务",
+      "total_green_house_gas_emissions": "56.22",
+      "CO2_emissions": "56.22",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.2.7",
+      "emission_source": "机械动力传动设备制造",
+      "total_green_house_gas_emissions": "35.30",
+      "CO2_emissions": "35.30",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.2.8",
+      "emission_source": "测量、分配及其他泵类设备制造",
+      "total_green_house_gas_emissions": "432.06",
+      "CO2_emissions": "432.06",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.2.9",
+      "emission_source": "用于测量、显示和控制工业过程变量的仪器及相关产品制造",
+      "total_green_house_gas_emissions": "11.18",
+      "CO2_emissions": "11.18",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.2.10",
+      "emission_source": "所有其他杂项电气设备及元件制造",
+      "total_green_house_gas_emissions": "555.07",
+      "CO2_emissions": "555.07",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.2.11",
+      "emission_source": "所有其他杂项制造",
+      "total_green_house_gas_emissions": "49,284.31",
+      "CO2_emissions": "49,284.31",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.3.1",
+      "emission_source": "液化石油气生产",
+      "total_green_house_gas_emissions": "9.45",
+      "CO2_emissions": "9.45",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.3.2",
+      "emission_source": "洗精煤生产",
+      "total_green_house_gas_emissions": "1,120,352.42",
+      "CO2_emissions": "1,120,352.42",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.3.3",
+      "emission_source": "柴油生产",
+      "total_green_house_gas_emissions": "1,182.23",
+      "CO2_emissions": "1,182.23",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.3.4",
+      "emission_source": "汽油生产",
+      "total_green_house_gas_emissions": "48.44",
+      "CO2_emissions": "48.44",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.3.5",
+      "emission_source": "焦炭生产",
+      "total_green_house_gas_emissions": "184,347.32",
+      "CO2_emissions": "184,347.32",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.3.6",
+      "emission_source": "焦屑生产",
+      "total_green_house_gas_emissions": "152,835.17",
+      "CO2_emissions": "152,835.17",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.3.7",
+      "emission_source": "烟煤生产",
+      "total_green_house_gas_emissions": "229,690.01",
+      "CO2_emissions": "229,690.01",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.3.8",
+      "emission_source": "无烟煤生产",
+      "total_green_house_gas_emissions": "149,948.24",
+      "CO2_emissions": "149,948.24",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.3.9",
+      "emission_source": "天然气生产",
+      "total_green_house_gas_emissions": "11,120.27",
+      "CO2_emissions": "11,120.27",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.3.10",
+      "emission_source": "外购电力上游排放",
+      "total_green_house_gas_emissions": "167,202.53",
+      "CO2_emissions": "167,202.53",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.4.1",
+      "emission_source": "船运",
+      "total_green_house_gas_emissions": "256,608.97",
+      "CO2_emissions": "256,608.97",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.4.2",
+      "emission_source": "汽运",
+      "total_green_house_gas_emissions": "46,150.51",
+      "CO2_emissions": "46,150.51",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.4.3",
+      "emission_source": "铁路运输",
+      "total_green_house_gas_emissions": "59,524.77",
+      "CO2_emissions": "59,524.77",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.5.1",
+      "emission_source": "生活垃圾和厨余垃圾",
+      "total_green_house_gas_emissions": "969.24",
+      "CO2_emissions": "969.24",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.5.2",
+      "emission_source": "废油",
+      "total_green_house_gas_emissions": "104.70",
+      "CO2_emissions": "104.70",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.5.3",
+      "emission_source": "废油水",
+      "total_green_house_gas_emissions": "653.86",
+      "CO2_emissions": "653.86",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.5.4",
+      "emission_source": "煤焦油",
+      "total_green_house_gas_emissions": "145,058.80",
+      "CO2_emissions": "145,058.80",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.5.5",
+      "emission_source": "废弃物运输",
+      "total_green_house_gas_emissions": "849.43",
+      "CO2_emissions": "849.43",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.6.1",
+      "emission_source": "航运",
+      "total_green_house_gas_emissions": "327.76",
+      "CO2_emissions": "327.76",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.6.2",
+      "emission_source": "铁路运输",
+      "total_green_house_gas_emissions": "619.79",
+      "CO2_emissions": "619.79",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.6.3",
+      "emission_source": "员工差旅住宿",
+      "total_green_house_gas_emissions": "722.62",
+      "CO2_emissions": "722.62",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.7.1",
+      "emission_source": "通勤车",
+      "total_green_house_gas_emissions": "111.21",
+      "CO2_emissions": "111.21",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.7.2",
+      "emission_source": "电动车",
+      "total_green_house_gas_emissions": "474.52",
+      "CO2_emissions": "474.52",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.7.3",
+      "emission_source": "自驾油车",
+      "total_green_house_gas_emissions": "11,664.73",
+      "CO2_emissions": "11,664.73",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.7.4",
+      "emission_source": "自驾电车",
+      "total_green_house_gas_emissions": "1,072.13",
+      "CO2_emissions": "1,072.13",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.9.1",
+      "emission_source": "船运",
+      "total_green_house_gas_emissions": "53,478.16",
+      "CO2_emissions": "53,478.16",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.9.2",
+      "emission_source": "汽运",
+      "total_green_house_gas_emissions": "208,049.49",
+      "CO2_emissions": "208,049.49",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.9.3",
+      "emission_source": "铁路运输",
+      "total_green_house_gas_emissions": "11,086.47",
+      "CO2_emissions": "11,086.47",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.9.4",
+      "emission_source": "汽运-副产品",
+      "total_green_house_gas_emissions": "1,971.49",
+      "CO2_emissions": "1,971.49",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.10.1",
+      "emission_source": "锻材加工",
+      "total_green_house_gas_emissions": "113,275.66",
+      "CO2_emissions": "113,275.66",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.10.2",
+      "emission_source": "棒材加工",
+      "total_green_house_gas_emissions": "1,357,195.22",
+      "CO2_emissions": "1,357,195.22",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.10.3",
+      "emission_source": "钢管加工",
+      "total_green_house_gas_emissions": "72,250.34",
+      "CO2_emissions": "72,250.34",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.10.4",
+      "emission_source": "钢坯加工",
+      "total_green_house_gas_emissions": "203,898.73",
+      "CO2_emissions": "203,898.73",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.11.1",
+      "emission_source": "外售焦炉煤气燃烧",
+      "total_green_house_gas_emissions": "3,828.38",
+      "CO2_emissions": "3,828.38",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    },
+    {
+      "number": "3.12.1",
+      "emission_source": "产品报废",
+      "total_green_house_gas_emissions": "3,747.35",
+      "CO2_emissions": "3,747.35",
+      "CH4_emissions": "0.00",
+      "N2O_emissions": "0.00",
+      "HFCs_emissions": "0.00",
+      "PFCs_emissions": "0.00",
+      "SFs_emissions": "0.00",
+      "NF3_emissions": "0.00"
+    }
+  ],
+  "quantification_methods": {
+    "scope_1": {
+      "固定燃烧": "活动数据：燃料消耗量（吨或立方米）× 排放因子（kgCO2e/单位燃料）",
+      "移动燃烧": "活动数据：燃料消耗量（升）× 排放因子（kgCO2e/升）",
+      "散逸排放": "活动数据：制冷剂充注量（kg）× GWP值 × 排放因子",
+      "工艺过程排放": "活动数据：原料消耗量（吨）× 排放因子（kgCO2e/吨）"
+    },
+    "scope_2": {
+      "外购电力": "活动数据：外购电力电量（kWh）× 电网排放因子（kgCO2e/kWh）",
+      "外购热力": "活动数据：外购蒸汽量（GJ）× 排放因子（kgCO2e/GJ）"
+    },
+    "scope_3": {
+      "category_1": "外购商品和服务：活动数据为采购金额（万元）× 经济排放因子",
+      "category_2": "资本货物：活动数据为设备投资额（万元）× 经济排放因子",
+      "category_3": "燃料和能源相关逸出排放：活动数据为外购能源量 × 上游排放因子",
+      "category_4": "上下游运输配送：活动数据为运输距离（km）× 货物重量（吨）× 排放因子",
+      "category_5": "运营中废弃物：活动数据为废弃物量（吨）× 排放因子",
+      "category_6": "员工商务差旅：活动数据为飞行里程（km）× 排放因子",
+      "category_7": "员工通勤：活动数据为通勤距离（km）× 排放因子",
+      "category_8": "上游租赁资产：该类别数据不具备重要性，不进行量化",
+      "category_9": "运营中输入运输配送：活动数据为运输量（吨·km）× 排放因子",
+      "category_10": "已售产品使用：活动数据为产品数量 × 使用阶段排放因子",
+      "category_11": "已售产品加工：该类别数据不具备重要性，不进行量化",
+      "category_12": "已售产品报废：活动数据为产品数量 × 报废处理排放因子"
+    }
+  },
+  "scope_3_category_names": {
+    "category_1": "外购商品和服务",
+    "category_2": "资本货物",
+    "category_3": "燃料和能源相关逸出排放",
+    "category_4": "上下游运输和配送",
+    "category_5": "运营中产生的废弃物",
+    "category_6": "员工商务差旅",
+    "category_7": "员工上下班通勤",
+    "category_8": "上游租赁资产",
+    "category_9": "运营中输入的运输和配送",
+    "category_10": "已售产品的使用过程",
+    "category_11": "已售产品的加工",
+    "category_12": "已售产品的报废处理"
+  },
+  "scope3_category8": [],
+  "scope3_category13": [],
+  "scope3_category14": [],
+  "scope3_category15": []
+}

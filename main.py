@@ -4,19 +4,24 @@ from docxtpl import DocxTemplate
 import os
 
 
-def format_number(value, decimals=2):
+def format_number(value, decimals=2, with_comma=True):
     """
-    格式化数字：保留指定小数位数（展示层格式化）
+    格式化数字：添加千分位分隔符，保留指定小数位数（展示层格式化）
 
     Args:
         value: 数值（float 或 int）
         decimals: 小数位数，默认 2
+        with_comma: 是否添加千分位分隔符，默认 True
 
     Returns:
         格式化后的字符串
     """
     try:
-        return f"{float(value):.{decimals}f}"
+        float_value = float(value)
+        if with_comma:
+            return f"{float_value:,.{decimals}f}"
+        else:
+            return f"{float_value:.{decimals}f}"
     except (ValueError, TypeError):
         return "0.00"
 
@@ -113,12 +118,30 @@ def prepare_context_with_formatting(context):
 
     all_number_fields = number_fields + alias_fields
 
-    # 为每个数值字段创建格式化版本
+    # 添加字段别名映射（data_reader使用短字段名，模板期望长字段名）
+    field_aliases = {
+        'scope_1': 'scope_1_emissions',
+        'scope_2_location': 'scope_2_location_based_emissions',
+        'scope_2_market': 'scope_2_market_based_emissions',
+        'scope_3': 'scope_3_emissions',
+    }
+    
+    # 为每个别名创建对应的完整字段名
+    for short_name, long_name in field_aliases.items():
+        if short_name in context:
+            formatted_context[long_name] = context[short_name]
+            formatted_context[f'{long_name}_formatted'] = format_number(context[short_name])
+
+    # 为每个数值字段创建格式化版本（跳过已经通过别名映射创建的字段）
     for field in all_number_fields:
+        formatted_key = f'{field}_formatted'
+        # 如果这个字段已经被格式化过了（通过别名映射），跳过
+        if formatted_key in formatted_context:
+            continue
         if field in context and context[field] is not None:
-            formatted_context[f'{field}_formatted'] = format_number(context[field])
+            formatted_context[formatted_key] = format_number(context[field])
         else:
-            formatted_context[f'{field}_formatted'] = format_number(0)
+            formatted_context[formatted_key] = format_number(0)
 
     # 为范围三类别添加 display 字段（处理0值显示说明文字）
     # 有数据的类别：显示格式化数字
