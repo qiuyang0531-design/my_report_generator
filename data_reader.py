@@ -1,6 +1,8 @@
 import openpyxl 
 import csv
 import os
+from report_config import ReportConfig
+
 
 class ExcelDataReader:
     def _safe_float(self, value):
@@ -34,54 +36,6 @@ class ExcelDataReader:
             data['flags'][flag_key] = safe_float(data.get(key, 0)) > 0
 
         return data
-
-    def get_quantification_methods(self):
-        """返回各类别的量化方法说明"""
-        return {
-            'scope_1': {
-                '固定燃烧': '活动数据：燃料消耗量（吨或立方米）× 排放因子（kgCO2e/单位燃料）',
-                '移动燃烧': '活动数据：燃料消耗量（升）× 排放因子（kgCO2e/升）',
-                '散逸排放': '活动数据：制冷剂充注量（kg）× GWP值 × 排放因子',
-                '工艺过程排放': '活动数据：原料消耗量（吨）× 排放因子（kgCO2e/吨）'
-            },
-            'scope_2': {
-                '外购电力': '活动数据：外购电力电量（kWh）× 电网排放因子（kgCO2e/kWh）',
-                '外购热力': '活动数据：外购蒸汽量（GJ）× 排放因子（kgCO2e/GJ）'
-            },
-            'scope_3': {
-                'category_1': '外购商品和服务：活动数据为采购金额（万元）× 经济排放因子',
-                'category_2': '资本货物：活动数据为设备投资额（万元）× 经济排放因子',
-                'category_3': '燃料和能源相关逸出排放：活动数据为外购能源量 × 上游排放因子',
-                'category_4': '上下游运输配送：活动数据为运输距离（km）× 货物重量（吨）× 排放因子',
-                'category_5': '运营中废弃物：活动数据为废弃物量（吨）× 排放因子',
-                'category_6': '员工商务差旅：活动数据为飞行里程（km）× 排放因子',
-                'category_7': '员工通勤：活动数据为通勤距离（km）× 排放因子',
-                'category_8': '上游租赁资产：该类别数据不具备重要性，不进行量化',
-                'category_9': '运营中输入运输配送：活动数据为运输量（吨·km）× 排放因子',
-                'category_10': '已售产品使用：活动数据为产品数量 × 使用阶段排放因子',
-                'category_11': '已售产品加工：该类别数据不具备重要性，不进行量化',
-                'category_12': '已售产品报废：活动数据为产品数量 × 报废处理排放因子'
-            }
-        }
-
-    def get_scope_3_category_name(self, category_num):
-        """获取范围三类别名称"""
-        names = {
-            1: "外购商品和服务",
-            2: "资本货物",
-            3: "燃料和能源相关逸出排放",
-            4: "上下游运输和配送",
-            5: "运营中产生的废弃物",
-            6: "员工商务差旅",
-            7: "员工上下班通勤",
-            8: "上游租赁资产",
-            9: "运营中输入的运输和配送",
-            10: "已售产品的使用过程",
-            11: "已售产品的加工",
-            12: "已售产品的报废处理"
-        }
-        return names.get(category_num, f"类别{category_num}")
-
     def __init__(self, filepath):
         """ 
         初始化时，加载 Excel 工作簿。 
@@ -89,6 +43,8 @@ class ExcelDataReader:
         self.workbook = None
         self.filepath = filepath
         self.file_type = None
+        self.company_name = None
+        self.reporting_period = '2024年'  # 默认报告期
         
         # 检查文件类型
         if filepath.endswith('.xlsx') or filepath.endswith('.xls'):
@@ -395,7 +351,7 @@ class ExcelDataReader:
 
     def _clean_cell_value(self, value):
         """
-        清理和标准化单元格值
+        清理和标准化单元格值 - 增强版，彻底去除冗余空格
 
         Args:
             value: 原始单元格值
@@ -412,8 +368,15 @@ class ExcelDataReader:
 
         # 处理字符串
         if isinstance(value, str):
-            # 去除首尾空格和换行符
+            # 1. 先去除首尾空格和换行符
             cleaned = value.strip()
+            
+            # 2. 替换换行符为空格，并去除多余空格
+            cleaned = cleaned.replace("\n", " ")
+            # 3. 将多个连续空格替换为单个空格
+            cleaned = re.sub(r'\s+', ' ', cleaned)
+            # 4. 再次去除首尾空格（确保不会以空格开头或结尾）
+            cleaned = cleaned.strip()
 
             # 空字符串转为None
             if cleaned == '':
@@ -749,12 +712,17 @@ class ExcelDataReader:
             result = self._update_flags(result)
 
             # Add quantification methods data
-            result['quantification_methods'] = self.get_quantification_methods()
+            # Use ReportConfig for quantification methods
+            report_config = ReportConfig(
+                company_name or '某公司',
+                reporting_period or '2024年'
+            )
+            result['quantification_methods'] = report_config.get_quantification_methods()
 
             # Add scope 3 category names mapping
-            result['scope_3_category_names'] = {}
-            for i in range(1, 13):
-                result['scope_3_category_names'][f'category_{i}'] = self.get_scope_3_category_name(i)
+            # Use ReportConfig for scope 3 category names
+            report_config_names = ReportConfig()
+            result['scope_3_category_names'] = report_config_names.get_all_scope_3_category_names()
 
 
             return result
@@ -1037,6 +1005,10 @@ class ExcelDataReader:
                     import re
                     year_match = re.search(r'(\d{4})', str(period))
                     data['report_year'] = year_match.group(1) if year_match else '2024'
+
+                    # 赋值给 self 变量，供 ReportConfig 使用
+                    self.company_name = data.get('company_name')
+                    self.reporting_period = data.get('reporting_period') or '2024年'
                 except (ValueError, TypeError):
                     data['total_emission_location'] = 0.0
                     data['total_emission_market'] = 0.0
@@ -1415,6 +1387,10 @@ class ExcelDataReader:
         # 从报告周期中提取年份（假设格式为"2024年1月1日至2024年12月31日"）
         report_year = '2024'  # 直接提取年份
 
+        # 赋值给 self 变量，供 ReportConfig 使用
+        self.company_name = company_name
+        self.reporting_period = report_period or '2024年'  # 默认值
+
         # 获取范围一排放量
         scope_1 = None
         try:
@@ -1599,7 +1575,7 @@ class ExcelDataReader:
         # 将所有数据打包，保留之前添加的scope2_items、scope3_category1等变量
 
         # 计算范围三各类别的排放量（用于模板显示）
-        for i in range(1, 13):
+        for i in range(1, 16):
             cat_key = f'scope3_category{i}'
             if cat_key in data and data[cat_key]:
                 # 计算该类别的总排放量
@@ -1644,12 +1620,17 @@ class ExcelDataReader:
         data = self._update_flags(data)
 
         # Add quantification methods data
-        data['quantification_methods'] = self.get_quantification_methods()
+        # Use ReportConfig for quantification methods
+        report_config = ReportConfig(
+            self.company_name or '某公司',
+            self.reporting_period or '2024年'
+        )
+        data['quantification_methods'] = report_config.get_quantification_methods()
 
         # Add scope 3 category names mapping
-        data['scope_3_category_names'] = {}
-        for i in range(1, 13):
-            data['scope_3_category_names'][f'category_{i}'] = self.get_scope_3_category_name(i)
+        # Use ReportConfig for scope 3 category names
+        report_config_names = ReportConfig()
+        data['scope_3_category_names'] = report_config_names.get_all_scope_3_category_names()
         # 确保表格数据存在（模板需要这些字段）
         if 'scope1_items' not in data or 'scope2_3_items' not in data:
             print("警告：scope1_items或scope2_3_items缺失，尝试从scope2_items生成...")
@@ -1773,6 +1754,10 @@ class ExcelDataReader:
                         year_match = re.search(r'(\d{4})', str(value))
                         data['report_year'] = year_match.group(1) if year_match else '2024'
 
+            # 赋值给 self 变量，供 ReportConfig 使用
+            self.company_name = data.get('company_name')
+            self.reporting_period = data.get('reporting_period') or '2024年'
+
             print(f"从'基本信息'工作表读取完成，公司名称: {data.get('company_name')}")
         else:
             # 如果没有"基本信息"工作表，使用原来的方法
@@ -1793,6 +1778,10 @@ class ExcelDataReader:
                 data['report_year'] = year_match.group(1) if year_match else '2024'
             else:
                 data['report_year'] = '2024'
+
+            # 赋值给 self 变量，供 ReportConfig 使用
+            self.company_name = data.get('company_name')
+            self.reporting_period = data.get('reporting_period') or '2024年'
 
         # 确保 report_year 存在
         if 'report_year' not in data:
@@ -2011,8 +2000,15 @@ class ExcelDataReader:
 
                     # 格式化排放量数字（保留两位小数）
                     def format_emission(val):
-                        if val is None:
-                            return '0.00'
+                        if val is None or val == 0:
+                            return ''
+                        try:
+                            float_value = float(val)
+                            if float_value == 0:
+                                return ''
+                            return f"{float_value:.2f}"
+                        except (ValueError, TypeError):
+                            return 
                         try:
                             return f"{float(val):.2f}"
                         except (ValueError, TypeError):
@@ -2398,12 +2394,16 @@ class ExcelDataReader:
         print(f"纯 xlsx 动态提取完成，范围三类别数据: {sum(1 for i in range(1, 16) if data.get(f'scope_3_category_{i}_emissions', 0) > 0)} 个类别有数据")
 
         # Add quantification methods data
-        data['quantification_methods'] = self.get_quantification_methods()
+        # Use ReportConfig for quantification methods
+        report_config = ReportConfig(
+            self.company_name or '某公司',
+            self.reporting_period or '2024年'
+        )
+        data['quantification_methods'] = report_config.get_quantification_methods()
 
-        # Add scope 3 category names mapping
-        data['scope_3_category_names'] = {}
-        for i in range(1, 13):
-            data['scope_3_category_names'][f'category_{i}'] = self.get_scope_3_category_name(i)
+        # Use ReportConfig for scope 3 category names
+        report_config_names = ReportConfig()
+        data['scope_3_category_names'] = report_config_names.get_all_scope_3_category_names()
 
 
         # Update flags based on data

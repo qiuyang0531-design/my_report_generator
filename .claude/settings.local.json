@@ -19,7 +19,11 @@
       "Bash(\"D:\\\\my_report_generator\\\\env\\\\Scripts\\\\python.exe\" -c \"\nimport openpyxl\n\nwb = openpyxl.load_workbook\\(''test_data.xlsx'', data_only=True\\)\nsheet = wb[''表1温室气体盘查表'']\n\nprint\\(''查看范围二相关区域（行100-120）:''\\)\nfor row_num in range\\(100, 121\\):\n    if row_num <= sheet.max_row:\n        row = sheet[row_num]\n        a_val = row[0].value if len\\(row\\) > 0 else None\n        b_val = row[1].value if len\\(row\\) > 1 else None\n        c_val = row[2].value if len\\(row\\) > 2 else None\n        d_val = row[3].value if len\\(row\\) > 3 else None\n        if a_val or b_val or c_val or d_val:\n            print\\(f''行{row_num}: A={a_val}, B={b_val}, C={c_val}, D={d_val}''\\)\n\")",
       "Bash(\"D:\\\\my_report_generator\\\\env\\\\Scripts\\\\python.exe\" -c \"\n# 分析之前的问题\nprint\\(''之前读取失败的原因分析:''\\)\nprint\\(''='' * 60\\)\nprint\\(''1. 使用了 iter_rows\\(values_only=True\\)''\\)\nprint\\(''   - 返回的是值，不是单元格对象''\\)\nprint\\(''   - 无法访问 row[0].row 属性获取行号''\\)\nprint\\(\\)\nprint\\(''2. 查找关键字错误''\\)\nprint\\(''   - 代码查找: \"\"外购热力\"\"''\\)\nprint\\(''   - 实际逻辑: Excel中E列标注\"\"基于市场\"\"的行''\\)\nprint\\(\\)\nprint\\(''3. 数据位置理解错误''\\)\nprint\\(''   - 代码试图在\"\"外购热力\"\"行下面查找''\\)\nprint\\(''   - 实际: 基于市场的数据在同一行C列，E列标注说明''\\)\n\")",
       "Bash(powershell:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(cp:*)",
+      "Bash(mv:*)",
+      "Bash(grep:*)",
+      "Bash(sed:*)"
     ],
     "deny": [],
     "ask": []
