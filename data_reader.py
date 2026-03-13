@@ -1,7 +1,132 @@
-import openpyxl 
+import openpyxl
 import csv
 import os
+import re
 from report_config import ReportConfig
+
+
+# ========== 表格协议配置 (TABLE_PROTOCOLS) ==========
+# 基于特征指纹的表格类型定义
+# 每个协议定义了：
+# - keywords: 用于识别表格的关键词集合
+# - required_keywords: 必须包含的关键词
+# - field_mapping: 从Excel列到标准字段的映射
+TABLE_PROTOCOLS = {
+    'EmissionFactorProtocol': {
+        'name': '排放因子表',
+        'description': '包含低位发热量、氧化率、基于热值排放系数等信息的表格',
+        'keywords': {'低位发热量', '氧化率', '基于热值排放系数', '排放因子', 'GHG排放类别', '计算值', '排放系数'},
+        'required_keywords': {'低位发热量', '氧化率'},  # 必须包含这2个关键词（与活动数据汇总表区分）
+        'field_mapping': {
+            # 标准字段名 -> (Excel列关键词, 默认值, 数据类型)
+            # 字段名与模板 Jinja2 变量一致: {{item.xxx}}
+            'category': ('GHG排放类别', '', 'str'),              # {{item.category}}
+            'number': ('编号', '', 'str'),                        # {{item.number}}
+            'emission_source': ('排放源', '', 'str'),            # {{item.emission_source}}
+            'facility': ('设施', '', 'str'),                      # {{item.facility}}
+            'ncv': ('低位发热量', 0, 'float'),                   # {{item.ncv}} - 低位发热量
+            'unit': ('单位', '', 'str'),                         # {{item.unit}} - 单位
+            'ox_rate': ('氧化率', 0, 'float'),                   # {{item.ox_rate}} - 氧化率
+            'ef_val': ('计算值', 0, 'float'),                    # {{item.ef_val}} - 排放系数/计算值
+            # 备选匹配词
+            'ef_val_alt': ('排放系数', 0, 'float'),              # 备选: 排放系数
+            'ef_val_alt2': ('基于热值排放系数', 0, 'float'),     # 备选: 基于热值排放系数
+            'CO2_emission_factor': ('CO2', 0, 'float'),          # {{item.CO2_emission_factor}}
+            'CH4_emission_factor': ('CH4', 0, 'float'),          # {{item.CH4_emission_factor}}
+            'N2O_emission_factor': ('N2O', 0, 'float'),          # {{item.N2O_emission_factor}}
+        },
+        'output_var': 'pro_ef_items'  # 新的模板变量名
+    },
+
+    'GWPProtocol': {
+        'name': 'GWP值表',
+        'description': '全球变暖潜势(GWP)值参考表',
+        'keywords': {'GWP', 'GWP(HFCs)', 'GWP(PFCs)', '工业名称', '中文名称', '化学分子式'},
+        'required_keywords': {'GWP'},
+        'field_mapping': {
+            'gas_name': ('工业名称', '', 'str'),
+            'chinese_name': ('中文名称/化学分子式', '', 'str'),
+            'formula': ('中文名称/化学分子式', '', 'str'),
+            'composition_ratio': ('组成比例', None, 'float'),
+            'gwp_value': ('GWP', 0, 'float'),
+            'gwp_hfcs': ('GWP(HFCs)', None, 'float'),
+            'gwp_pfcs': ('GWP(PFCs)', None, 'float'),
+            'source': ('来源', '', 'str'),
+            'note': ('备注', '', 'str'),
+        },
+        'output_var': 'gwp_items'
+    },
+
+    'GHGInventoryProtocol': {
+        'name': '温室气体盘查表',
+        'description': '温室气体排放盘查汇总表',
+        'keywords': {'GHG排放类别', '排放源', '设施', 'GWP', 'EF', '活动数据', '排放量'},
+        'required_keywords': {'GHG排放类别', '排放量'},
+        'field_mapping': {
+            'category': ('GHG排放类别', '', 'str'),
+            'emission_source': ('排放源', '', 'str'),
+            'facility': ('设施', '', 'str'),
+            'activity_data': ('活动数据', 0, 'float'),
+            'activity_data_unit': ('单位', '', 'str'),
+            'emission_factor': ('EF', 0, 'float'),
+            'gwp': ('GWP', 1, 'float'),
+            'emissions': ('排放量', 0, 'float'),
+            'emissions_unit': ('tCO2e', '', 'str'),
+        },
+        'output_var': 'ghg_inventory_items'
+    },
+
+    'ActivitySummaryProtocol': {
+        'name': '活动数据汇总表',
+        'description': '基于位置或市场的活动数据汇总表',
+        'keywords': {'活动数据汇总', 'GHG', '基于位置', '基于市场', 'CO2', 'CH4', 'N2O'},
+        'required_keywords': {'活动数据汇总'},
+        'field_mapping': {
+            'category': ('GHG排放类别', '', 'str'),
+            'emission_source': ('排放源', '', 'str'),
+            'facility': ('设施', '', 'str'),
+            'activity_data': ('活动数据', 0, 'float'),
+            'unit': ('单位', '', 'str'),
+            'co2_emissions': ('CO2', 0, 'float'),
+            'ch4_emissions': ('CH4', 0, 'float'),
+            'n2o_emissions': ('N2O', 0, 'float'),
+            'total_emissions': ('总计', 0, 'float'),
+        },
+        'output_var': 'activity_summary_items'
+    },
+
+    'UncertaintyProtocol': {
+        'name': '不确定性评估表',
+        'description': '基于位置或市场的不确定性评估表',
+        'keywords': {'不确定性', '评估', '基于位置', '基于市场', '扩展不确定度'},
+        'required_keywords': {'不确定性'},
+        'field_mapping': {
+            'category': ('GHG排放类别', '', 'str'),
+            'emission_source': ('排放源', '', 'str'),
+            'activity_data_uncertainty': ('活动数据', 0, 'float'),
+            'emission_factor_uncertainty': ('排放因子', 0, 'float'),
+            'combined_uncertainty': ('合成不确定度', 0, 'float'),
+            'extended_uncertainty': ('扩展不确定度', 0, 'float'),
+        },
+        'output_var': 'uncertainty_items'
+    },
+
+    'ReductionActionProtocol': {
+        'name': '减排行动统计表',
+        'description': '减排行动统计信息表',
+        'keywords': {'减排行动', '统计', '项目', '减排量'},
+        'required_keywords': {'减排行动'},
+        'field_mapping': {
+            'project_name': ('项目名称', '', 'str'),
+            'implementation_date': ('实施日期', '', 'str'),
+            'reduction_type': ('减排类型', '', 'str'),
+            'annual_reduction': ('年减排量', 0, 'float'),
+            'reduction_unit': ('单位', '', 'str'),
+            'description': ('描述', '', 'str'),
+        },
+        'output_var': 'reduction_action_items'
+    },
+}
 
 
 class ExcelDataReader:
@@ -13,6 +138,12 @@ class ExcelDataReader:
             return float(value)
         except (ValueError, TypeError):
             return 0.0
+
+    def _safe_str(self, value):
+        """安全地将值转换为字符串"""
+        if value is None:
+            return ''
+        return str(value).strip()
 
     def _update_flags(self, data):
         """更新 Flags 标记系统"""
@@ -36,6 +167,947 @@ class ExcelDataReader:
             data['flags'][flag_key] = safe_float(data.get(key, 0)) > 0
 
         return data
+
+    def _find_activity_summary_sheet(self):
+        """
+        自动查找包含"活动数据汇总"和"基于位置"关键词的工作表
+
+        Returns:
+            找到的工作表名称，如果未找到返回 None
+        """
+        if not self.workbook:
+            return None
+
+        try:
+            for sheet_name in self.workbook.sheetnames:
+                # 检查sheet名称是否同时包含"活动数据汇总"和"基于位置"
+                if '活动数据汇总' in sheet_name and '基于位置' in sheet_name:
+                    print(f"找到活动数据汇总表（基于位置）: {sheet_name}")
+                    return sheet_name
+
+            # 如果名称中没找到，尝试检查内容
+            for sheet_name in self.workbook.sheetnames:
+                sheet = self.workbook[sheet_name]
+                has_activity_summary = False
+                has_location_based = False
+
+                # 检查前20行内容
+                for row in sheet.iter_rows(max_row=20):
+                    for cell in row:
+                        if cell.value and isinstance(cell.value, str):
+                            cell_text = str(cell.value)
+                            if '活动数据汇总' in cell_text:
+                                has_activity_summary = True
+                            if '基于位置' in cell_text or 'Location-based' in cell_text:
+                                has_location_based = True
+
+                if has_activity_summary and has_location_based:
+                    print(f"通过内容识别活动数据汇总表（基于位置）: {sheet_name}")
+                    return sheet_name
+
+            print("警告：未找到活动数据汇总表（基于位置）")
+            return None
+
+        except Exception as e:
+            print(f"查找活动数据汇总表时出错: {e}")
+            return None
+
+    # ========== 基于特征指纹的表格识别和提取 ==========
+
+    def _identify_table_type(self, sheet_name, check_rows=20):
+        """
+        基于特征指纹识别表格类型
+
+        Args:
+            sheet_name: 工作表名称
+            check_rows: 检查前N行以识别特征
+
+        Returns:
+            匹配的协议类型名称，如 'EmissionFactorProtocol'
+            如果未匹配返回 None
+        """
+        if not self.workbook or sheet_name not in self.workbook.sheetnames:
+            return None
+
+        try:
+            sheet = self.workbook[sheet_name]
+
+            # 收集前N行的所有唯一字符串值
+            unique_strings = set()
+            for row_idx in range(1, min(check_rows + 1, sheet.max_row + 1)):
+                for cell in sheet[row_idx]:
+                    if cell.value and isinstance(cell.value, str):
+                        # 去除空格并添加到集合
+                        cleaned_value = str(cell.value).strip()
+                        if cleaned_value:
+                            unique_strings.add(cleaned_value)
+
+            # 对每个协议类型进行匹配
+            for protocol_name, protocol_config in TABLE_PROTOCOLS.items():
+                required = protocol_config['required_keywords']
+
+                # 检查是否包含所有必需关键词
+                if required.issubset(unique_strings):
+                    # 计算匹配度（可选关键词的匹配数）
+                    optional_keywords = protocol_config['keywords'] - required
+                    matched_optional = len(optional_keywords & unique_strings)
+                    total_optional = len(optional_keywords) if optional_keywords else 1
+
+                    match_ratio = matched_optional / total_optional if total_optional > 0 else 1
+
+                    print(f"[表格识别] {sheet_name} 匹配到 {protocol_config['name']} "
+                          f"(必需关键词: {len(required)}/{len(required)}, "
+                          f"可选关键词: {matched_optional}/{total_optional})")
+
+                    # 如果匹配度超过50%，则认为是该类型
+                    if match_ratio >= 0.3:
+                        return protocol_name
+
+            print(f"[表格识别] {sheet_name} 未匹配到已知协议类型")
+            print(f"  发现的关键词: {sorted(list(unique_strings))[:20]}")
+            return None
+
+        except Exception as e:
+            print(f"[表格识别] 识别表格类型时出错: {e}")
+            return None
+
+    def _find_header_row(self, sheet, keywords, max_row=20):
+        """
+        查找包含特定关键词的表头行
+
+        Args:
+            sheet: openpyxl工作表对象
+            keywords: 表头关键词集合
+            max_row: 最大搜索行数
+
+        Returns:
+            表头行索引（从1开始），未找到返回None
+        """
+        for row_idx in range(1, min(max_row + 1, sheet.max_row + 1)):
+            row_values = set()
+            for cell in sheet[row_idx]:
+                if cell.value and isinstance(cell.value, str):
+                    row_values.add(str(cell.value).strip())
+
+            # 检查是否包含足够的关键词
+            matched_count = len(keywords & row_values)
+            if matched_count >= min(2, len(keywords)):
+                return row_idx
+
+        return None
+
+    def _get_column_mapping(self, sheet, header_row, field_mapping):
+        """
+        根据表头行创建列索引映射
+        支持多行表头（主表头 + 子表头）
+
+        Args:
+            sheet: openpyxl工作表对象
+            header_row: 表头行索引
+            field_mapping: 字段映射配置
+
+        Returns:
+            {标准字段名: 列索引} 的字典
+        """
+        column_map = {}
+
+        # 收集多行表头的所有值（支持主表头和子表头）
+        header_cells = {}
+        rows_to_check = [header_row, header_row + 1]  # 检查主表头和下一行（子表头）
+
+        for row_idx in rows_to_check:
+            if row_idx > sheet.max_row:
+                continue
+            for cell in sheet[row_idx]:
+                if cell.value and isinstance(cell.value, str):
+                    header_value = str(cell.value).strip()
+                    # 只记录第一次遇到的列（主表头优先）
+                    if header_value not in header_cells:
+                        header_cells[header_value] = cell.column - 1  # 转换为0-based索引
+
+        # 为每个标准字段查找对应的列
+        for standard_field, (keyword, default, dtype) in field_mapping.items():
+            # 尝试精确匹配
+            if keyword in header_cells:
+                column_map[standard_field] = header_cells[keyword]
+            else:
+                # 尝试模糊匹配
+                for header_value in header_cells:
+                    if keyword in header_value or header_value in keyword:
+                        column_map[standard_field] = header_cells[header_value]
+                        break
+
+        return column_map
+
+    def _apply_ffill(self, data_items, field_names):
+        """
+        对指定字段应用前向填充(ffill)逻辑，处理合并单元格
+
+        Args:
+            data_items: 数据项列表
+            field_names: 需要应用ffill的字段名列表
+
+        Returns:
+            处理后的数据项列表
+        """
+        if not data_items:
+            return data_items
+
+        result = []
+        last_values = {field: None for field in field_names}
+
+        for item in data_items:
+            new_item = item.copy()
+
+            for field in field_names:
+                value = item.get(field)
+
+                if value and str(value).strip():  # 有值
+                    last_values[field] = value
+                    new_item[field] = value
+                elif last_values[field]:  # 空值，使用前一个值
+                    new_item[field] = last_values[field]
+
+            result.append(new_item)
+
+        return result
+
+    def _extract_protocol_data(self, sheet_name, protocol_name):
+        """
+        根据协议类型从工作表中提取标准化数据
+
+        Args:
+            sheet_name: 工作表名称
+            protocol_name: 协议类型名称
+
+        Returns:
+            标准化的数据项列表
+        """
+        if protocol_name not in TABLE_PROTOCOLS:
+            print(f"[数据提取] 未知协议类型: {protocol_name}")
+            return []
+
+        protocol_config = TABLE_PROTOCOLS[protocol_name]
+        field_mapping = protocol_config['field_mapping']
+
+        if not self.workbook or sheet_name not in self.workbook.sheetnames:
+            return []
+
+        try:
+            sheet = self.workbook[sheet_name]
+
+            # 查找表头行
+            header_keywords = {v[0] for v in field_mapping.values() if v[0]}
+            header_row = self._find_header_row(sheet, header_keywords)
+
+            if not header_row:
+                print(f"[数据提取] {sheet_name}: 未找到表头行")
+                return []
+
+            print(f"[数据提取] {sheet_name}: 找到表头在第{header_row}行")
+
+            # 获取列映射
+            column_map = self._get_column_mapping(sheet, header_row, field_mapping)
+
+            if not column_map:
+                print(f"[数据提取] {sheet_name}: 无法创建列映射")
+                return []
+
+            print(f"[数据提取] {sheet_name}: 列映射: {column_map}")
+
+            # 提取数据行
+            data_items = []
+            for row_idx in range(header_row + 1, sheet.max_row + 1):
+                row = sheet[row_idx]
+
+                # 检查是否是空行
+                row_has_data = False
+                for cell in row:
+                    if cell.value is not None:
+                        row_has_data = True
+                        break
+
+                if not row_has_data:
+                    continue
+
+                # 提取字段值
+                item = {}
+                for standard_field, (keyword, default, dtype) in field_mapping.items():
+                    if standard_field in column_map:
+                        col_idx = column_map[standard_field]
+                        cell = row[col_idx] if col_idx < len(row) else None
+
+                        if cell and cell.value is not None:
+                            # 根据数据类型转换
+                            if dtype == 'float':
+                                try:
+                                    item[standard_field] = float(cell.value)
+                                except (ValueError, TypeError):
+                                    item[standard_field] = default
+                            elif dtype == 'int':
+                                try:
+                                    item[standard_field] = int(cell.value)
+                                except (ValueError, TypeError):
+                                    item[standard_field] = default
+                            else:  # str
+                                item[standard_field] = str(cell.value).strip()
+                        else:
+                            item[standard_field] = default
+                    else:
+                        item[standard_field] = default
+
+                # 检查是否是有效数据行（至少有一个非默认值）
+                has_valid_data = False
+                for standard_field, (keyword, default, dtype) in field_mapping.items():
+                    value = item.get(standard_field)
+                    if value and value != default and str(value).strip():
+                        has_valid_data = True
+                        break
+
+                if has_valid_data:
+                    data_items.append(item)
+
+            print(f"[数据提取] {sheet_name}: 提取到 {len(data_items)} 行数据")
+
+            # 对特定字段应用ffill（如类别字段）
+            if protocol_name == 'EmissionFactorProtocol':
+                # 合并备选排放系数字段到主字段 ef_val
+                for item in data_items:
+                    if not item.get('ef_val') or item.get('ef_val') == 0:
+                        # 尝试使用备选字段
+                        for alt_field in ['ef_val_alt', 'ef_val_alt2']:
+                            if item.get(alt_field) and item.get(alt_field) != 0:
+                                item['ef_val'] = item[alt_field]
+                                break
+
+                # 应用 ffill 填充类别字段
+                ffill_fields = ['category']
+                data_items = self._apply_ffill(data_items, ffill_fields)
+                print(f"[数据提取] {sheet_name}: 应用ffill后数据行数: {len(data_items)}")
+
+            return data_items
+
+        except Exception as e:
+            print(f"[数据提取] {sheet_name}: 提取数据时出错: {e}")
+            import traceback
+            traceback.print_exc()
+            return []
+
+    def read_protocols(self):
+        """
+        基于特征指纹读取所有协议表格
+
+        Returns:
+            {output_var: data_items} 的字典
+        """
+        result = {}
+
+        if not self.workbook:
+            print("[协议读取] 工作簿未初始化")
+            return result
+
+        print(f"[协议读取] 开始识别和提取协议表格，共 {len(self.workbook.sheetnames)} 个工作表")
+
+        for sheet_name in self.workbook.sheetnames:
+            # 识别表格类型
+            protocol_type = self._identify_table_type(sheet_name)
+
+            if protocol_type:
+                protocol_config = TABLE_PROTOCOLS[protocol_type]
+                output_var = protocol_config['output_var']
+
+                # 提取数据
+                data_items = self._extract_protocol_data(sheet_name, protocol_type)
+
+                # 存储到结果字典
+                result[output_var] = data_items
+
+                print(f"[协议读取] {sheet_name} -> {output_var}: {len(data_items)} 行")
+
+        # 确保所有输出变量都被初始化
+        for protocol_config in TABLE_PROTOCOLS.values():
+            output_var = protocol_config['output_var']
+            if output_var not in result:
+                result[output_var] = []
+                print(f"[协议读取] 初始化空变量: {output_var} = []")
+
+        # ========== 新增：按类别分组 pro_ef_items ==========
+        # 将 pro_ef_items 按类别分组，为三个独立的表格提供数据
+        if 'pro_ef_items' in result and result['pro_ef_items']:
+            # 同时设置 emission_factor_items（用于 Tables 22-24）
+            result['emission_factor_items'] = result['pro_ef_items']
+            print(f"[协议读取] 设置 emission_factor_items: {len(result['emission_factor_items'])} 条")
+
+            # 按类别分组
+            grouped_data = self._group_pro_ef_items_by_category(result['pro_ef_items'])
+            result.update(grouped_data)
+            print(f"[协议读取] 按类别分组 pro_ef_items:")
+            for group_name, items in grouped_data.items():
+                print(f"  {group_name}: {len(items)} 条")
+        # ========== 类别分组结束 ==========
+
+        # ========== 新增：提取范围一直接排放源数据 ==========
+        # 重要：范围一数据包含实际排放量，会覆盖排放因子的分组数据
+        scope1_data = self._extract_scope1_emissions_data()
+        # 只更新非空的组（保留排放因子数据的备用）
+        for group_name, items in scope1_data.items():
+            if items:  # 只有当有数据时才覆盖
+                result[group_name] = items
+                print(f"[协议读取] 覆盖范围一数据 {group_name}: {len(items)} 条")
+        # ========== 范围一数据提取结束 ==========
+
+        return result
+
+    def _group_pro_ef_items_by_category(self, pro_ef_items):
+        """
+        将 pro_ef_items 按类别分组为模板所需的变量
+
+        Args:
+            pro_ef_items: 原始排放因子数据列表
+
+        Returns:
+            包含分组数据的字典，使用模板期望的变量名
+        """
+        grouped = {
+            'scope1_stationary_combustion_emissions_items': [],  # 固定燃烧
+            'scope1_mobile_combustion_emissions_items': [],      # 移动燃烧
+            'scope1_fugitive_emissions_items': [],               # 逸散排放
+            'scope1_process_emissions_items': [],                # 制程排放
+        }
+
+        # 调试：记录每个类别的分配情况
+        debug_categories = {}
+
+        for item in pro_ef_items:
+            category = item.get('category', '')
+
+            # 移除空格以处理"移 动燃 烧"这种带空格的类别
+            category_normalized = category.replace(' ', '')
+
+            # 详细调试：打印第一个"移动燃烧"的匹配过程
+            if '移动燃烧' in category:
+                print(f"[DEBUG] Processing category: '{category}'")
+                print(f"  category_normalized: '{category_normalized}'")
+                print(f"  '固定燃烧' in category_normalized: {'固定燃烧' in category_normalized}")
+                print(f"  '移动燃烧' in category_normalized: {'移动燃烧' in category_normalized}")
+                print(f"  '移动汽油' in category_normalized: {'移动汽油' in category_normalized}")
+                print(f"  '移动柴油' in category_normalized: {'移动柴油' in category_normalized}")
+                print(f"  '制冷产品加工使用等排放' in category_normalized: {'制冷产品加工使用等排放' in category_normalized}")
+                print(f"  '制程' in category_normalized: {'制程' in category_normalized}")
+                print(f"  '逸散' in category_normalized: {'逸散' in category_normalized}")
+
+            # 优先匹配更具体的关键词（使用归一化后的类别进行匹配）
+            # 固定燃烧
+            if '固定燃烧' in category_normalized:
+                grouped['scope1_stationary_combustion_emissions_items'].append(item)
+                if category not in debug_categories:
+                    debug_categories[category] = []
+                debug_categories[category].append('stationary')
+            # 移动燃烧（包括移动汽油、移动柴油等）
+            elif '移动燃烧' in category_normalized or '移动汽油' in category_normalized or '移动柴油' in category_normalized:
+                grouped['scope1_mobile_combustion_emissions_items'].append(item)
+                if category not in debug_categories:
+                    debug_categories[category] = []
+                debug_categories[category].append('mobile')
+            # 制程排放
+            elif '制冷产品加工使用等排放' in category_normalized or '制程' in category_normalized:
+                grouped['scope1_process_emissions_items'].append(item)
+                if category not in debug_categories:
+                    debug_categories[category] = []
+                debug_categories[category].append('process')
+            # 逸散排放
+            elif '逸散' in category_normalized:
+                grouped['scope1_fugitive_emissions_items'].append(item)
+                if category not in debug_categories:
+                    debug_categories[category] = []
+                debug_categories[category].append('fugitive')
+
+        # 调试输出
+        print(f"[类别分组] 分组统计:")
+        for group_name, items in grouped.items():
+            print(f"  {group_name}: {len(items)} 条")
+
+        return grouped
+
+    def _extract_scope1_emissions_data(self):
+        """
+        从附表1-温室气体盘查表中提取范围一直接排放源数据
+
+        Returns:
+            包含分组数据的字典:
+            - scope1_stationary_combustion_emissions_items (固定燃烧)
+            - scope1_mobile_combustion_emissions_items (移动燃烧)
+            - scope1_fugitive_emissions_items (逸散排放)
+            - scope1_process_emissions_items (制程排放)
+        """
+        result = {
+            'scope1_stationary_combustion_emissions_items': [],
+            'scope1_mobile_combustion_emissions_items': [],
+            'scope1_fugitive_emissions_items': [],
+            'scope1_process_emissions_items': [],
+        }
+
+        if not self.workbook:
+            print("[范围一排放] 工作簿未初始化")
+            return result
+
+        # 找到附表1-温室气体盘查表
+        target_sheet = None
+        for sheet in self.workbook.worksheets:
+            title = sheet.title
+            # 使用更宽松的匹配条件
+            if '附表1' in title or ('温室' in title and '盘查' in title and '1' in title):
+                target_sheet = sheet
+                break
+
+        # 如果还没找到，尝试使用索引
+        if not target_sheet and len(self.workbook.worksheets) > 4:
+            target_sheet = self.workbook.worksheets[4]  # 通常附表1在索引4
+
+        if not target_sheet:
+            print("[范围一排放] 未找到附表1-温室气体盘查表")
+            return result
+
+        print(f"[范围一排放] 找到工作表: {target_sheet.title}")
+
+        # 数据从第5行开始（前4行是标题）
+        data_start_row = 5
+
+        for row_idx in range(data_start_row, target_sheet.max_row + 1):
+            try:
+                row = target_sheet[row_idx]
+
+                # 读取各列数据
+                number = self._safe_str(row[0].value)
+                category = self._safe_str(row[1].value)
+                emission_source = self._safe_str(row[2].value)
+                facility = self._safe_str(row[3].value)
+
+                # 如果编号为空，跳过
+                if not number or number.strip() == '':
+                    continue
+
+                # 读取排放量数据（Columns 30-37）
+                # 注意：这些列包含公式，需要计算值
+                co2_emissions = self._safe_float(row[30].value) if len(row) > 30 else 0
+                ch4_emissions = self._safe_float(row[31].value) if len(row) > 31 else 0
+                n2o_emissions = self._safe_float(row[32].value) if len(row) > 32 else 0
+                hfcs_emissions = self._safe_float(row[33].value) if len(row) > 33 else 0
+                pfcs_emissions = self._safe_float(row[34].value) if len(row) > 34 else 0
+                sf6_emissions = self._safe_float(row[35].value) if len(row) > 35 else 0
+                nf3_emissions = self._safe_float(row[36].value) if len(row) > 36 else 0
+                total_emissions = self._safe_float(row[37].value) if len(row) > 37 else 0
+
+                # 创建数据项
+                item = {
+                    'number': number,
+                    'category': category,
+                    'emission_source': emission_source,
+                    'facility': facility,
+                    'CO2_emissions': co2_emissions,
+                    'CH4_emissions': ch4_emissions,
+                    'N2O_emissions': n2o_emissions,
+                    'HFCs_emissions': hfcs_emissions,
+                    'PFCs_emissions': pfcs_emissions,
+                    'SF6_emissions': sf6_emissions,
+                    'NF3_emissions': nf3_emissions,
+                    'total_green_house_gas_emissions': total_emissions,
+                }
+
+                # 根据类别分组
+                if '固定燃烧' in category:
+                    result['scope1_stationary_combustion_emissions_items'].append(item)
+                elif '移动燃烧' in category or '移动汽油' in category or '移动柴油' in category:
+                    result['scope1_mobile_combustion_emissions_items'].append(item)
+                elif '逸散排放' in category or '逸散' in category:
+                    result['scope1_fugitive_emissions_items'].append(item)
+                elif '制程排放' in category or '制程' in category:
+                    result['scope1_process_emissions_items'].append(item)
+
+            except Exception as e:
+                print(f"[范围一排放] 处理Row {row_idx}时出错: {e}")
+                continue
+
+        print(f"[范围一排放] 提取完成:")
+        for group_name, items in result.items():
+            print(f"  {group_name}: {len(items)} 条")
+
+        return result
+
+    def _extract_activity_summary_data(self, sheet_name):
+        """
+        从活动数据汇总表中提取数据
+
+        Args:
+            sheet_name: 工作表名称
+
+        Returns:
+            包含活动数据汇总的字典列表
+        """
+        if not self.workbook or sheet_name not in self.workbook.sheetnames:
+            return []
+
+        try:
+            sheet = self.workbook[sheet_name]
+            result = []
+
+            # 第一步：定位表头行
+            # 表头特征：包含"序号"、"排放源"、"报告边界"、"活动数据"等关键词
+            # 注意：表头行可能不包含所有关键词，只要包含大部分即可
+            header_row_idx = None
+            header_keywords = ['序号', '排放源', '报告边界', '活动数据']
+
+            for row_idx in range(1, min(20, sheet.max_row + 1)):
+                row = sheet[row_idx]
+                row_values = [str(cell.value) if cell.value else '' for cell in row]
+                row_text = ''.join(row_values)
+
+                # 检查是否包含表头关键词（至少包含3个）
+                match_count = sum(1 for keyword in header_keywords if keyword in row_text)
+                if match_count >= 3:
+                    header_row_idx = row_idx
+                    print(f"找到表头行: 第{row_idx}行 (匹配关键词数: {match_count})")
+                    break
+
+            if header_row_idx is None:
+                print("警告：未找到活动数据汇总表的表头行")
+                return []
+
+            # 第二步：读取表头，建立列名到列索引的映射
+            header_row = sheet[header_row_idx]
+            column_mapping = {}
+
+            for col_idx, cell in enumerate(header_row, start=1):
+                if cell.value:
+                    col_name = str(cell.value).strip()
+                    column_mapping[col_name] = col_idx
+
+            print(f"表头列映射: {list(column_mapping.keys())}")
+
+            # 第三步：确定各排放量列的位置
+            # 根据表格结构：
+            # 列30: CO2排放量, 列31: CH4排放量, 列32: N2O排放量
+            # 列33: HFCs排放量, 列34: PFCs排放量, 列35: SF6排放量
+            # 列36: NF3排放量, 列37: 总量
+
+            # 实际列位置需要通过查找包含"tCO2e"和温室气体名称的表头来确定
+            emission_columns = {}
+            for row_idx in range(max(1, header_row_idx - 2), header_row_idx + 3):
+                row = sheet[row_idx]
+                for col_idx, cell in enumerate(row, start=1):
+                    if cell.value and isinstance(cell.value, str):
+                        val = str(cell.value).strip()
+                        # 查找包含温室气体名称且在较后列（通常是排放量列）的单元格
+                        # 同时检查是否包含"tCO2e"或位于列20之后
+                        if col_idx >= 20:
+                            if val == 'CO2' or 'CO2排放' in val:
+                                emission_columns['CO2_emissions'] = col_idx
+                            elif val == 'CH4' or 'CH4排放' in val:
+                                emission_columns['CH4_emissions'] = col_idx
+                            elif val == 'N2O' or 'N2O排放' in val:
+                                emission_columns['N2O_emissions'] = col_idx
+                            elif val == 'HFCs' or 'HFCs排放' in val:
+                                emission_columns['HFCs_emissions'] = col_idx
+                            elif val == 'PFCs' or 'PFCs排放' in val:
+                                emission_columns['PFCs_emissions'] = col_idx
+                            elif val == 'SF6' or 'SF6排放' in val:
+                                emission_columns['SF6_emissions'] = col_idx
+                            elif val == 'NF3' or 'NF3排放' in val:
+                                emission_columns['NF3_emissions'] = col_idx
+                            elif '总量' in val or '总计' in val:
+                                emission_columns['total_green_house_gas_emissions'] = col_idx
+
+            print(f"排放量列映射: {emission_columns}")
+
+            # 第四步：读取数据行
+            current_emission_category = ''  # 用于前向填充GHG排放类别
+
+            for row_idx in range(header_row_idx + 1, sheet.max_row + 1):
+                row = sheet[row_idx]
+
+                # 获取序号列的值，判断是否是有效数据行
+                number_cell = row[0]  # 序号在第1列
+                number_value = number_cell.value
+
+                # 如果序号列为空，跳过
+                if number_value is None or str(number_value).strip() == '':
+                    continue
+
+                # 尝试将序号转换为数字
+                try:
+                    number_val = float(str(number_value).strip())
+                    if number_val <= 0:  # 跳过非正数序号
+                        continue
+                except (ValueError, TypeError):
+                    continue
+
+                # 获取各列的值
+                def get_cell_value(col_idx):
+                    if col_idx < 1 or col_idx > len(row):
+                        return ''
+                    cell = row[col_idx - 1]
+                    if cell.value is None:
+                        return ''
+                    return str(cell.value).strip()
+
+                # GHG排放类别（前向填充）
+                emission_category = get_cell_value(2)  # 第2列
+                if emission_category and emission_category != '':
+                    current_emission_category = emission_category
+
+                # 提取数据 - 使用与模板匹配的字段名
+                item = {
+                    'number': get_cell_value(1),  # 序号
+                    'emission_source_type_loc': current_emission_category,  # GHG排放类别（简短名称，与模板匹配）
+                    'emission_source_type_location_based': current_emission_category,  # 完整名称（兼容）
+                    'emission_source_loc': get_cell_value(3),  # 排放源（简短名称）
+                    'emission_source_location_based': get_cell_value(3),  # 完整名称（兼容）
+                    'report_boundary_loc': get_cell_value(4),  # 报告边界（简短名称）
+                    'report_boundary_location_based': get_cell_value(4),  # 完整名称（兼容）
+                    'act_summary_loc': get_cell_value(5),  # 活动数据数值（模板期望的字段名）
+                    'activity_data_location_based': get_cell_value(5),  # 完整名称（兼容）
+                    'act_summary_loc_unit': get_cell_value(6),  # 活动数据单位（模板期望的字段名）
+                    'activity_data_unit_location_based': get_cell_value(6),  # 完整名称（兼容）
+                }
+
+                # 排放量数据
+                for field_name, col_idx in emission_columns.items():
+                    value = get_cell_value(col_idx)
+                    item[field_name] = value
+                    # 同时保留带 _formatted 后缀的版本（将在格式化时填充）
+                    item[f'{field_name}_formatted'] = value
+
+                result.append(item)
+
+            print(f"从活动数据汇总表提取到 {len(result)} 行数据")
+            return result
+
+        except Exception as e:
+            print(f"提取活动数据汇总表数据时出错: {e}")
+            import traceback
+            traceback.print_exc()
+            return []
+
+    def _find_activity_summary_sheet_market_based(self):
+        """
+        自动查找包含"活动数据汇总"和"基于市场"关键词的工作表
+
+        Returns:
+            找到的工作表名称，如果未找到返回 None
+        """
+        if not self.workbook:
+            return None
+
+        try:
+            for sheet_name in self.workbook.sheetnames:
+                # 检查sheet名称是否同时包含"活动数据汇总"和"基于市场"
+                if '活动数据汇总' in sheet_name and '基于市场' in sheet_name:
+                    print(f"找到活动数据汇总表（基于市场）: {sheet_name}")
+                    return sheet_name
+
+            # 如果名称中没找到，尝试检查内容
+            for sheet_name in self.workbook.sheetnames:
+                sheet = self.workbook[sheet_name]
+                has_activity_summary = False
+                has_market_based = False
+
+                # 检查前20行内容
+                for row in sheet.iter_rows(max_row=20):
+                    for cell in row:
+                        if cell.value and isinstance(cell.value, str):
+                            cell_text = str(cell.value)
+                            if '活动数据汇总' in cell_text:
+                                has_activity_summary = True
+                            if '基于市场' in cell_text or 'Market-based' in cell_text:
+                                has_market_based = True
+
+                if has_activity_summary and has_market_based:
+                    print(f"通过内容识别活动数据汇总表（基于市场）: {sheet_name}")
+                    return sheet_name
+
+            print("警告：未找到活动数据汇总表（基于市场）")
+            return None
+
+        except Exception as e:
+            print(f"查找活动数据汇总表（基于市场）时出错: {e}")
+            return None
+
+    def _extract_activity_summary_data_market_based(self, sheet_name):
+        """
+        从活动数据汇总表（基于市场）中提取数据
+
+        Args:
+            sheet_name: 工作表名称
+
+        Returns:
+            包含活动数据汇总的字典列表
+        """
+        if not self.workbook or sheet_name not in self.workbook.sheetnames:
+            return []
+
+        try:
+            sheet = self.workbook[sheet_name]
+            result = []
+
+            # 第一步：定位表头行
+            header_row_idx = None
+            header_keywords = ['序号', '排放源', '报告边界', '活动数据']
+
+            for row_idx in range(1, min(20, sheet.max_row + 1)):
+                row = sheet[row_idx]
+                row_values = [str(cell.value) if cell.value else '' for cell in row]
+                row_text = ''.join(row_values)
+
+                # 检查是否包含表头关键词（至少包含3个）
+                match_count = sum(1 for keyword in header_keywords if keyword in row_text)
+                if match_count >= 3:
+                    header_row_idx = row_idx
+                    print(f"找到表头行: 第{row_idx}行 (匹配关键词数: {match_count})")
+                    break
+
+            if header_row_idx is None:
+                print("警告：未找到活动数据汇总表（基于市场）的表头行")
+                return []
+
+            # 第二步：读取表头，建立列名到列索引的映射
+            header_row = sheet[header_row_idx]
+            column_mapping = {}
+
+            for col_idx, cell in enumerate(header_row, start=1):
+                if cell.value:
+                    col_name = str(cell.value).strip()
+                    column_mapping[col_name] = col_idx
+
+            print(f"表头列映射: {list(column_mapping.keys())}")
+
+            # 第三步：确定各排放量列的位置
+            emission_columns = {}
+            for row_idx in range(max(1, header_row_idx - 2), header_row_idx + 3):
+                row = sheet[row_idx]
+                for col_idx, cell in enumerate(row, start=1):
+                    if cell.value and isinstance(cell.value, str):
+                        val = str(cell.value).strip()
+                        # 查找包含温室气体名称且在较后列（通常是排放量列）的单元格
+                        if col_idx >= 20:
+                            if val == 'CO2' or 'CO2排放' in val:
+                                emission_columns['CO2_emissions'] = col_idx
+                            elif val == 'CH4' or 'CH4排放' in val:
+                                emission_columns['CH4_emissions'] = col_idx
+                            elif val == 'N2O' or 'N2O排放' in val:
+                                emission_columns['N2O_emissions'] = col_idx
+                            elif val == 'HFCs' or 'HFCs排放' in val:
+                                emission_columns['HFCs_emissions'] = col_idx
+                            elif val == 'PFCs' or 'PFCs排放' in val:
+                                emission_columns['PFCs_emissions'] = col_idx
+                            elif val == 'SF6' or 'SF6排放' in val:
+                                emission_columns['SF6_emissions'] = col_idx
+                            elif val == 'NF3' or 'NF3排放' in val:
+                                emission_columns['NF3_emissions'] = col_idx
+                            elif '总量' in val or '总计' in val:
+                                emission_columns['total_green_house_gas_emissions'] = col_idx
+
+            print(f"排放量列映射: {emission_columns}")
+
+            # 第四步：读取数据行
+            current_emission_category = ''  # 用于前向填充GHG排放类别
+
+            for row_idx in range(header_row_idx + 1, sheet.max_row + 1):
+                row = sheet[row_idx]
+
+                # 获取序号列的值，判断是否是有效数据行
+                number_cell = row[0]  # 序号在第1列
+                number_value = number_cell.value
+
+                # 如果序号列为空，跳过
+                if number_value is None or str(number_value).strip() == '':
+                    continue
+
+                # 尝试将序号转换为数字
+                try:
+                    number_val = float(str(number_value).strip())
+                    if number_val <= 0:  # 跳过非正数序号
+                        continue
+                except (ValueError, TypeError):
+                    continue
+
+                # 获取各列的值
+                def get_cell_value(col_idx):
+                    if col_idx < 1 or col_idx > len(row):
+                        return ''
+                    cell = row[col_idx - 1]
+                    if cell.value is None:
+                        return ''
+                    return str(cell.value).strip()
+
+                # GHG排放类别（前向填充）
+                emission_category = get_cell_value(2)  # 第2列
+                if emission_category and emission_category != '':
+                    current_emission_category = emission_category
+
+                # 提取数据 - 使用与模板匹配的字段名
+                item = {
+                    'number': get_cell_value(1),  # 序号
+                    'emission_source_type_mar': current_emission_category,  # GHG排放类别（简短名称，与模板匹配）
+                    'emission_source_type_market_based': current_emission_category,  # 完整名称（兼容）
+                    'emission_source_mar': get_cell_value(3),  # 排放源（简短名称，与模板匹配）
+                    'emission_source_market_based': get_cell_value(3),  # 完整名称（兼容）
+                    'report_boundary_mar': get_cell_value(4),  # 报告边界（简短名称，与模板匹配）
+                    'report_boundary_market_based': get_cell_value(4),  # 完整名称（兼容）
+                    'act_summary_mar': get_cell_value(5),  # 活动数据数值（模板期望的字段名）
+                    'activity_data_market_based': get_cell_value(5),  # 完整名称（兼容）
+                    'act_summary_mar_unit': get_cell_value(6),  # 活动数据单位（模板期望的字段名）
+                    'activity_data_unit_market_based': get_cell_value(6),  # 完整名称（兼容）
+                }
+
+                # 排放量数据
+                for field_name, col_idx in emission_columns.items():
+                    value = get_cell_value(col_idx)
+                    item[field_name] = value
+                    # 同时保留带 _formatted 后缀的版本（将在格式化时填充）
+                    item[f'{field_name}_formatted'] = value
+
+                result.append(item)
+
+            print(f"从活动数据汇总表（基于市场）提取到 {len(result)} 行数据")
+            return result
+
+        except Exception as e:
+            print(f"提取活动数据汇总表（基于市场）数据时出错: {e}")
+            import traceback
+            traceback.print_exc()
+            return []
+
+    def get_merged_cell_value(self, sheet, row, col):
+        """
+        获取单元格的值，处理合并单元格的情况。
+
+        如果指定坐标在合并区域内，返回该合并区域左上角单元格的值。
+        否则返回该单元格的直接值。
+
+        Args:
+            sheet: openpyxl 工作表对象
+            row: 行号（从1开始）
+            col: 列号（从1开始）
+
+        Returns:
+            单元格的值，如果是合并单元格则返回合并区域左上角的值
+        """
+        try:
+            # 检查是否在合并区域内
+            for merged_range in sheet.merged_cells.ranges:
+                if merged_range.min_row <= row <= merged_range.max_row and \
+                   merged_range.min_col <= col <= merged_range.max_col:
+                    # 在合并区域内，返回左上角单元格的值
+                    top_left_cell = sheet.cell(row=merged_range.min_row, column=merged_range.min_col)
+                    return top_left_cell.value
+
+            # 不在合并区域内，直接返回单元格值
+            cell = sheet.cell(row=row, column=col)
+            return cell.value
+        except Exception as e:
+            print(f"获取合并单元格值时出错 (row={row}, col={col}): {e}")
+            return None
+
     def __init__(self, filepath):
         """ 
         初始化时，加载 Excel 工作簿。 
@@ -1184,6 +2256,15 @@ class ExcelDataReader:
 
                         print(f"提取到范围三详细排放明细总计: {total_scope3_items} 行")
 
+                # ========== 基于特征指纹读取协议表格 ==========
+                print("\n[协议读取] 开始基于特征指纹读取协议表格...")
+                protocol_data = self.read_protocols()
+                data.update(protocol_data)
+                print(f"[协议读取] 成功读取 {len(protocol_data)} 个协议变量")
+                for var_name, items in protocol_data.items():
+                    print(f"  - {var_name}: {len(items)} 行")
+                # ========== 协议表格读取结束 ==========
+
                 return data
 
         # ========== 如果CSV不存在，使用Excel数据（向后兼容） ==========
@@ -1193,10 +2274,25 @@ class ExcelDataReader:
             data['emission_reductions'] = emission_reductions
             data['file_type'] = 'csv'
             print(f"从CSV文件提取减排行动数据，共 {len(emission_reductions)} 条记录")
+
+            # CSV文件不支持协议表格，初始化空协议变量
+            from data_reader import TABLE_PROTOCOLS
+            for protocol_config in TABLE_PROTOCOLS.values():
+                output_var = protocol_config['output_var']
+                if output_var not in data:
+                    data[output_var] = []
+
             return data
 
         # 处理Excel文件（温室气体排放数据）
         if not self.workbook or self.file_type != 'excel':
+            # 非Excel文件不支持协议表格，初始化空协议变量
+            from data_reader import TABLE_PROTOCOLS
+            for protocol_config in TABLE_PROTOCOLS.values():
+                output_var = protocol_config['output_var']
+                if output_var not in data:
+                    data[output_var] = []
+
             return data
 
         # ========== 从温室气体盘查表提取scope2_items和scope3_items ==========
@@ -1634,15 +2730,24 @@ class ExcelDataReader:
         # 确保表格数据存在（模板需要这些字段）
         if 'scope1_items' not in data or 'scope2_3_items' not in data:
             print("警告：scope1_items或scope2_3_items缺失，尝试从scope2_items生成...")
-            
+
             # 如果scope1_items缺失，创建空的列表
             if 'scope1_items' not in data:
                 data['scope1_items'] = []
-            
+
             # 如果scope2_3_items缺失，使用scope2_items创建
             if 'scope2_3_items' not in data and 'scope2_items' in data:
                 data['scope2_3_items'] = data['scope2_items']
-        
+
+        # ========== 基于特征指纹读取协议表格 ==========
+        print("\n[协议读取] 开始基于特征指纹读取协议表格...")
+        protocol_data = self.read_protocols()
+        data.update(protocol_data)
+        print(f"[协议读取] 成功读取 {len(protocol_data)} 个协议变量")
+        for var_name, items in protocol_data.items():
+            print(f"  - {var_name}: {len(items)} 行")
+        # ========== 协议表格读取结束 ==========
+
         return data
     def extract_data_from_xlsx_dynamic(self, xlsx_path=None):
         """
@@ -1884,24 +2989,34 @@ class ExcelDataReader:
                 scope1_table_items = []  # 表1：范围一直接排放源
                 scope2_3_table_items = []  # 表2：范围二三间接排放源
 
+                # 维护类别变量用于前向填充（ffill）
+                current_category = ""
+
                 # 从第5行开始（前4行是标题）
                 for row in sheet1_data.iter_rows(min_row=5):
                     if len(row) < 7:
                         continue
 
                     # 获取各列数据
+                    current_row = row[0].row
                     seq = row[0].value  # 序号
-                    ghg_category = row[1].value  # GHG排放类别
+                    ghg_category = row[1].value  # GHG排放类别（第2列，索引为1）
                     emission_source = row[2].value  # 排放源
                     facility = row[3].value  # 设施
                     boundary = row[4].value  # 组织边界
 
+                    # 实现前向填充逻辑（ffill）：如果当前行的类别为空，使用上一行的类别
+                    if ghg_category:
+                        current_category = str(ghg_category).strip()
+                    # 即使 ghg_category 为空，也使用 current_category
+
                     # 跳过空行或标题行
-                    if not seq and not ghg_category:
+                    if not seq and not current_category:
                         continue
 
                     seq_str = str(seq).strip() if seq else ''
-                    ghg_str = str(ghg_category).strip() if ghg_category else ''
+                    # 使用 current_category（前向填充后的类别）
+                    ghg_str = current_category if current_category else ''
                     source_str = str(emission_source).strip() if emission_source else ''
                     facility_str = str(facility).strip() if facility else ''
                     boundary_str = str(boundary).strip() if boundary else ''
@@ -1913,7 +3028,7 @@ class ExcelDataReader:
                     # 表1：范围一
                     if '范围一' in boundary_str:
                         scope1_table_items.append({
-                            'name': ghg_str,  # GHG排放类别
+                            'name': ghg_str,  # GHG排放类别（使用前向填充的值）
                             'number': seq_str,  # 序号
                             'emission_source': source_str,  # 排放源
                             'facility': facility_str  # 设施
@@ -1922,7 +3037,7 @@ class ExcelDataReader:
                     # 表2：范围二三
                     elif '范围二' in boundary_str or '范围三' in boundary_str:
                         scope2_3_table_items.append({
-                            'name': ghg_str,  # GHG排放类别
+                            'name': ghg_str,  # GHG排放类别（使用前向填充的值）
                             'number': seq_str,  # 序号
                             'emission_source': source_str,  # 排放源
                             'facility': facility_str  # 设施
@@ -1952,6 +3067,10 @@ class ExcelDataReader:
                 scope1_detail_items = []  # 范围一详细表数据（从盘查清册提取）
 
                 # 从第14行开始（第12行是标题，第13行是单位）
+                # 维护当前类别用于前向填充（ffill）
+                current_category = ""
+                current_sub_category = ""
+
                 for row in inventory_sheet.iter_rows(min_row=14):
                     if len(row) < 13:
                         continue
@@ -1988,7 +3107,9 @@ class ExcelDataReader:
                             source_str = str(col_c).strip() if col_c else ''
                         # B列是类别名称（如"范围一 直接排放"）
                         else:
-                            # 跳过类别标题行（"范围一 直接排放"）
+                            # 更新当前类别（用于前向填充）
+                            current_category = col_b_str
+                            # 跳过类别标题行，但继续处理后续行
                             continue
 
                     facility_str = str(facility).strip() if facility else ''
@@ -2000,25 +3121,35 @@ class ExcelDataReader:
 
                     # 格式化排放量数字（保留两位小数）
                     def format_emission(val):
-                        if val is None or val == 0:
+                        if val is None:
                             return ''
+                        if val == 0:
+                            return "0.00"
                         try:
                             float_value = float(val)
                             if float_value == 0:
-                                return ''
+                                return "0.00"
                             return f"{float_value:.2f}"
-                        except (ValueError, TypeError):
-                            return 
-                        try:
-                            return f"{float(val):.2f}"
                         except (ValueError, TypeError):
                             return '0.00'
 
                     # 范围一：编号以1开头（如1.1, 1.1.1）
                     if number_str.startswith('1.'):
+                        # 确定子类别（根据编号前缀判断）
+                        if number_str.startswith('1.1.'):
+                            current_sub_category = '固定源燃烧'
+                        elif number_str.startswith('1.2.'):
+                            current_sub_category = '移动源燃烧'
+                        elif number_str.startswith('1.3.'):
+                            current_sub_category = '遗散源'
+                        elif number_str.startswith('1.4.'):
+                            current_sub_category = '工艺排放'
+
+                        # 使用编号作为主标识，但保留类别信息
                         scope1_detail_items.append({
-                            'name': number_str,  # 始终使用编号作为name
+                            'name': current_sub_category or number_str,  # 使用子类别名称
                             'number': number_str,
+                            'category': current_category,  # 添加类别字段
                             'emission_source': source_str,
                             'facility': facility_str,
                             'note': note_str,
@@ -2072,22 +3203,54 @@ class ExcelDataReader:
                 # 先计算各分类的汇总值
                 # 固定源燃烧汇总
                 for col in emission_columns:
-                    total = sum(float(item.get(col, '0').replace(',', '')) for item in scope1_stationary_combustion)
+                    total = 0.0
+                    for item in scope1_stationary_combustion:
+                        emission_str = item.get(col, '0')
+                        if emission_str and emission_str.strip():
+                            try:
+                                emission_str = emission_str.replace(',', '').replace(' ', '')
+                                total += float(emission_str)
+                            except (ValueError, TypeError):
+                                pass
                     data[f'scope1_stationary_combustion_emissions_{col}_sum_formatted'] = f"{total:.2f}"
 
                 # 移动源燃烧汇总
                 for col in emission_columns:
-                    total = sum(float(item.get(col, '0').replace(',', '')) for item in scope1_mobile_combustion)
+                    total = 0.0
+                    for item in scope1_mobile_combustion:
+                        emission_str = item.get(col, '0')
+                        if emission_str and emission_str.strip():
+                            try:
+                                emission_str = emission_str.replace(',', '').replace(' ', '')
+                                total += float(emission_str)
+                            except (ValueError, TypeError):
+                                pass
                     data[f'scope1_mobile_combustion_emissions_{col}_sum_formatted'] = f"{total:.2f}"
 
                 # 遗散源汇总
                 for col in emission_columns:
-                    total = sum(float(item.get(col, '0').replace(',', '')) for item in scope1_fugitive)
+                    total = 0.0
+                    for item in scope1_fugitive:
+                        emission_str = item.get(col, '0')
+                        if emission_str and emission_str.strip():
+                            try:
+                                emission_str = emission_str.replace(',', '').replace(' ', '')
+                                total += float(emission_str)
+                            except (ValueError, TypeError):
+                                pass
                     data[f'scope1_fugitive_emissions_{col}_sum_formatted'] = f"{total:.2f}"
 
                 # 工艺排放汇总
                 for col in emission_columns:
-                    total = sum(float(item.get(col, '0').replace(',', '')) for item in scope1_process)
+                    total = 0.0
+                    for item in scope1_process:
+                        emission_str = item.get(col, '0')
+                        if emission_str and emission_str.strip():
+                            try:
+                                emission_str = emission_str.replace(',', '').replace(' ', '')
+                                total += float(emission_str)
+                            except (ValueError, TypeError):
+                                pass
                     data[f'scope1_process_emissions_{col}_sum_formatted'] = f"{total:.2f}"
 
                 # 范围一总计 = 各分类汇总的和（避免重复计算类别行的排放量）
@@ -2405,9 +3568,38 @@ class ExcelDataReader:
         report_config_names = ReportConfig()
         data['scope_3_category_names'] = report_config_names.get_all_scope_3_category_names()
 
+        # ========== 提取活动数据汇总表（基于位置） ==========
+        print("[活动数据汇总表] 开始提取活动数据汇总表（基于位置）...")
+        activity_summary_sheet = self._find_activity_summary_sheet()
+        if activity_summary_sheet:
+            data['act_summary_loc'] = self._extract_activity_summary_data(activity_summary_sheet)
+            print(f"[活动数据汇总表] 成功提取 {len(data['act_summary_loc'])} 行数据")
+        else:
+            data['act_summary_loc'] = []
+            print("[活动数据汇总表] 未找到活动数据汇总表，使用空列表")
+
+        # ========== 提取活动数据汇总表（基于市场） ==========
+        print("[活动数据汇总表] 开始提取活动数据汇总表（基于市场）...")
+        activity_summary_sheet_mkt = self._find_activity_summary_sheet_market_based()
+        if activity_summary_sheet_mkt:
+            data['act_summary_mar'] = self._extract_activity_summary_data_market_based(activity_summary_sheet_mkt)
+            print(f"[活动数据汇总表] 成功提取 {len(data['act_summary_mar'])} 行数据")
+        else:
+            data['act_summary_mar'] = []
+            print("[活动数据汇总表] 未找到活动数据汇总表（基于市场），使用空列表")
 
         # Update flags based on data
         data = self._update_flags(data)
+
+        # ========== 新增：基于特征指纹读取协议表格 ==========
+        print("\n[协议读取] 开始基于特征指纹读取协议表格...")
+        protocol_data = self.read_protocols()
+        data.update(protocol_data)
+        print(f"[协议读取] 成功读取 {len(protocol_data)} 个协议变量")
+        for var_name, items in protocol_data.items():
+            print(f"  - {var_name}: {len(items)} 行")
+        # ========== 协议表格读取结束 ==========
+
         return data
 
 

@@ -57,35 +57,25 @@ def format_emission(value, decimals=2):
     """
     格式化排放量数据（专门用于排放数据）
 
-    与 format_number 类似，但对于零值返回空字符串，
-    用于在模板中不显示无数据的排放项
+    内部调用 format_number 逻辑，确保格式统一
+    零值显示为 "0.00" 而非空字符串
 
     Args:
         value: 排放量数值
         decimals: 小数位数，默认 2
 
     Returns:
-        格式化后的字符串，零值返回空字符串
+        格式化后的字符串，零值返回 "0.00"
 
     Examples:
         >>> format_emission(7122248.83)
         '7,122,248.83'
         >>> format_emission(0)
-        ''
+        '0.00'
         >>> format_emission(None)
-        ''
+        '0.00'
     """
-    if value is None or value == 0:
-        return ""
-
-    try:
-        float_value = float(value)
-        if float_value > 0:
-            return f"{float_value:,.{decimals}f}"
-        else:
-            return ""
-    except (ValueError, TypeError):
-        return ""
+    return format_number(value, decimals=decimals, with_comma=True)
 
 
 def format_percent(value, decimals=2):
@@ -190,7 +180,7 @@ if __name__ == "__main__":
     # 测试 format_emission
     print("\n测试 format_emission:")
     print(f"  format_emission(7122248.83) = {format_emission(7122248.83)}")
-    print(f"  format_emission(0) = '{format_emission(0)}'")  # 应该是空字符串
+    print(f"  format_emission(0) = '{format_emission(0)}'")  # 应该是 "0.00"
     print(f"  format_emission(None) = '{format_emission(None)}'")
 
     # 测试 format_percent
@@ -206,4 +196,4 @@ if __name__ == "__main__":
     print(f"  format_yes_no(0) = {format_yes_no(0)}")
 
     print("\n" + "=" * 80)
-    print("✓ 所有过滤器测试完成")
+    print("[OK] 所有过滤器测试完成")

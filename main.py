@@ -1,5 +1,6 @@
 # main.py
-from data_reader import ExcelDataReader
+# 使用重构后的协议驱动型数据读取器
+from data_reader_refactored import ExcelDataReaderRefactored as ExcelDataReader
 from docxtpl import DocxTemplate
 from jinja2 import Environment
 import os
@@ -52,8 +53,9 @@ def prepare_context_with_formatting(context):
     为 context 添加格式化后的数值版本（展示层处理）
     保持原始数据不变，添加 _formatted 后缀的格式化版本
     对于排放量为0的类别，添加说明文字
-    
+
     新增：全局字符串清洗步骤，去除所有字符串值的冗余空格
+    新增：初始化所有协议变量以确保 Jinja2 兼容性
 
     Args:
         context: 原始数据字典
@@ -62,7 +64,29 @@ def prepare_context_with_formatting(context):
         包含格式化字段的新字典
     """
     formatted_context = context.copy()
-    
+
+    # ========== 新增：初始化所有协议变量（Jinja2兼容性）==========
+    # 确保所有协议变量在模板中可用，即使Excel中没有对应表格
+    protocol_output_vars = {
+        'pro_ef_items': [],           # 排放因子表（新模板变量名）
+        'emission_factor_items': [],  # 旧变量名（向后兼容）
+        'scope1_stationary_combustion_emissions_items': [],  # 固定燃烧
+        'scope1_mobile_combustion_emissions_items': [],      # 移动燃烧
+        'scope1_fugitive_emissions_items': [],               # 逸散排放
+        'scope1_process_emissions_items': [],                # 制程排放
+        'gwp_items': [],
+        'ghg_inventory_items': [],
+        'activity_summary_items': [],
+        'uncertainty_items': [],
+        'reduction_action_items': [],
+    }
+
+    for var_name, default_value in protocol_output_vars.items():
+        if var_name not in formatted_context:
+            formatted_context[var_name] = default_value
+            # print(f"[初始化协议变量] {var_name} = {default_value}")
+    # ========== 协议变量初始化结束 ==========
+
     # ========== 新增：全局字符串清洗步骤 ==========
     # 遍历所有值，对字符串类型执行 strip() 去除冗余空格
     def clean_strings_in_dict(d):
@@ -219,6 +243,225 @@ def prepare_context_with_formatting(context):
     else:
         formatted_context['scope_3_categories_not_in_scope_summary'] = ""
 
+    # ========== 格式化活动数据汇总表（基于位置） ==========
+    # 为 act_summary_loc 中的数值字段添加格式化处理
+    if 'act_summary_loc' in context and context['act_summary_loc']:
+        formatted_act_summary = []
+        emission_fields_to_format = [
+            'act_summary_loc',  # 模板期望的字段名（活动数据数值）
+            'activity_data_location_based',  # 完整字段名（兼容）
+            'CO2_emissions',
+            'CH4_emissions',
+            'N2O_emissions',
+            'HFCs_emissions',
+            'PFCs_emissions',
+            'SF6_emissions',
+            'NF3_emissions',
+            'total_green_house_gas_emissions'
+        ]
+
+        # 初始化汇总值
+        loc_sums = {
+            'CO2_emissions': 0.0,
+            'CH4_emissions': 0.0,
+            'N2O_emissions': 0.0,
+            'HFCs_emissions': 0.0,
+            'PFCs_emissions': 0.0,
+            'SF6_emissions': 0.0,
+            'NF3_emissions': 0.0,
+            'total_green_house_gas_emissions': 0.0
+        }
+
+        for item in context['act_summary_loc']:
+            formatted_item = item.copy()
+
+            # 为数值字段添加格式化版本
+            for field in emission_fields_to_format:
+                if field in item:
+                    original_value = item[field]
+                    # 尝试转换为浮点数进行汇总
+                    try:
+                        num_value = float(str(original_value).replace(',', '').replace(' ', '')) if original_value else 0
+                        if field in loc_sums:
+                            loc_sums[field] += num_value
+                    except (ValueError, TypeError):
+                        pass
+
+                    # 添加格式化版本（非空检查：确保输出 0.00 而不是空字符串）
+                    if field == 'act_summary_loc':
+                        # 活动数据使用格式化版本，同时保留原始值
+                        formatted_item[field] = format_number(original_value) if original_value else '0.00'
+                    elif field == 'activity_data_location_based':
+                        formatted_item[f'{field}_formatted'] = format_number(original_value) if original_value else '0.00'
+                    else:
+                        # 排放量字段
+                        formatted_item[field] = format_number(original_value) if original_value else '0.00'
+
+            formatted_act_summary.append(formatted_item)
+
+        formatted_context['act_summary_loc'] = formatted_act_summary
+        print(f"[活动数据汇总表] 已格式化 {len(formatted_act_summary)} 行数据")
+
+        # 添加汇总行数据（模板期望的格式）
+        formatted_context['loc_CO2_emissions_sum_formatted'] = format_number(loc_sums['CO2_emissions'])
+        formatted_context['loc_CH4_emissions_sum_formatted'] = format_number(loc_sums['CH4_emissions'])
+        formatted_context['loc_N2O_emissions_sum_formatted'] = format_number(loc_sums['N2O_emissions'])
+        formatted_context['loc_HFCs_emissions_sum_formatted'] = format_number(loc_sums['HFCs_emissions'])
+        formatted_context['loc_PFCs_emissions_sum_formatted'] = format_number(loc_sums['PFCs_emissions'])
+        formatted_context['loc_SF6_emissions_sum_formatted'] = format_number(loc_sums['SF6_emissions'])
+        formatted_context['loc_NF3_emissions_sum_formatted'] = format_number(loc_sums['NF3_emissions'])
+        formatted_context['loc_total_green_house_gas_emissions_sum_formatted'] = format_number(loc_sums['total_green_house_gas_emissions'])
+        print(f"[活动数据汇总表] 汇总行计算完成")
+    else:
+        formatted_context['act_summary_loc'] = []
+        # 设置空的汇总值
+        formatted_context['loc_CO2_emissions_sum_formatted'] = '0.00'
+        formatted_context['loc_CH4_emissions_sum_formatted'] = '0.00'
+        formatted_context['loc_N2O_emissions_sum_formatted'] = '0.00'
+        formatted_context['loc_HFCs_emissions_sum_formatted'] = '0.00'
+        formatted_context['loc_PFCs_emissions_sum_formatted'] = '0.00'
+        formatted_context['loc_SF6_emissions_sum_formatted'] = '0.00'
+        formatted_context['loc_NF3_emissions_sum_formatted'] = '0.00'
+        formatted_context['loc_total_green_house_gas_emissions_sum_formatted'] = '0.00'
+
+    # ========== 格式化活动数据汇总表（基于市场） ==========
+    # 为 act_summary_mar 中的数值字段添加格式化处理
+    if 'act_summary_mar' in context and context['act_summary_mar']:
+        formatted_act_summary_mar = []
+        emission_fields_to_format_mar = [
+            'act_summary_mar',  # 模板期望的字段名（活动数据数值）
+            'activity_data_market_based',  # 完整字段名（兼容）
+            'CO2_emissions',
+            'CH4_emissions',
+            'N2O_emissions',
+            'HFCs_emissions',
+            'PFCs_emissions',
+            'SF6_emissions',
+            'NF3_emissions',
+            'total_green_house_gas_emissions'
+        ]
+
+        # 初始化汇总值
+        mar_sums = {
+            'CO2_emissions': 0.0,
+            'CH4_emissions': 0.0,
+            'N2O_emissions': 0.0,
+            'HFCs_emissions': 0.0,
+            'PFCs_emissions': 0.0,
+            'SF6_emissions': 0.0,
+            'NF3_emissions': 0.0,
+            'total_green_house_gas_emissions': 0.0
+        }
+
+        for item in context['act_summary_mar']:
+            formatted_item = item.copy()
+
+            # 为数值字段添加格式化版本
+            for field in emission_fields_to_format_mar:
+                if field in item:
+                    original_value = item[field]
+                    # 尝试转换为浮点数进行汇总
+                    try:
+                        num_value = float(str(original_value).replace(',', '').replace(' ', '')) if original_value else 0
+                        if field in mar_sums:
+                            mar_sums[field] += num_value
+                    except (ValueError, TypeError):
+                        pass
+
+                    # 添加格式化版本（非空检查：确保输出 0.00 而不是空字符串）
+                    if field == 'act_summary_mar':
+                        # 活动数据使用格式化版本，同时保留原始值
+                        formatted_item[field] = format_number(original_value) if original_value else '0.00'
+                    elif field == 'activity_data_market_based':
+                        formatted_item[f'{field}_formatted'] = format_number(original_value) if original_value else '0.00'
+                    else:
+                        # 排放量字段
+                        formatted_item[field] = format_number(original_value) if original_value else '0.00'
+
+            formatted_act_summary_mar.append(formatted_item)
+
+        formatted_context['act_summary_mar'] = formatted_act_summary_mar
+        print(f"[活动数据汇总表] 已格式化 {len(formatted_act_summary_mar)} 行数据（基于市场）")
+
+        # 添加汇总行数据（模板期望的格式）
+        formatted_context['mar_CO2_emissions_sum_formatted'] = format_number(mar_sums['CO2_emissions'])
+        formatted_context['mar_CH4_emissions_sum_formatted'] = format_number(mar_sums['CH4_emissions'])
+        formatted_context['mar_N2O_emissions_sum_formatted'] = format_number(mar_sums['N2O_emissions'])
+        formatted_context['mar_HFCs_emissions_sum_formatted'] = format_number(mar_sums['HFCs_emissions'])
+        formatted_context['mar_PFCs_emissions_sum_formatted'] = format_number(mar_sums['PFCs_emissions'])
+        formatted_context['mar_SF6_emissions_sum_formatted'] = format_number(mar_sums['SF6_emissions'])
+        formatted_context['mar_NF3_emissions_sum_formatted'] = format_number(mar_sums['NF3_emissions'])
+        formatted_context['mar_total_green_house_gas_emissions_sum_formatted'] = format_number(mar_sums['total_green_house_gas_emissions'])
+        print(f"[活动数据汇总表] 汇总行计算完成（基于市场）")
+    else:
+        formatted_context['act_summary_mar'] = []
+        # 设置空的汇总值
+        formatted_context['mar_CO2_emissions_sum_formatted'] = '0.00'
+        formatted_context['mar_CH4_emissions_sum_formatted'] = '0.00'
+        formatted_context['mar_N2O_emissions_sum_formatted'] = '0.00'
+        formatted_context['mar_HFCs_emissions_sum_formatted'] = '0.00'
+        formatted_context['mar_PFCs_emissions_sum_formatted'] = '0.00'
+        formatted_context['mar_SF6_emissions_sum_formatted'] = '0.00'
+        formatted_context['mar_NF3_emissions_sum_formatted'] = '0.00'
+        formatted_context['mar_total_green_house_gas_emissions_sum_formatted'] = '0.00'
+
+    # ========== 格式化范围一直接排放源清册数据 ==========
+    # 为 scope1 排放项中的数值字段添加格式化处理（2位小数 + 千分位符）
+    # 确保零值显示为 "0.00" 而不是空字符串
+    scope1_emission_vars = [
+        'scope1_stationary_combustion_emissions_items',  # 固定燃烧
+        'scope1_mobile_combustion_emissions_items',      # 移动燃烧
+        'scope1_fugitive_emissions_items',               # 逸散排放
+        'scope1_process_emissions_items',                # 制程排放
+    ]
+
+    # 需要格式化的排放量字段
+    scope1_emission_fields = [
+        'CO2_emissions',
+        'CH4_emissions',
+        'N2O_emissions',
+        'HFCs_emissions',
+        'PFCs_emissions',
+        'SF6_emissions',
+        'NF3_emissions',
+        'total_green_house_gas_emissions'
+    ]
+
+    # 列名映射：数据源使用SF6，模板使用SFs
+    # 注意：需要同时输出 SF6_emissions (数据源) 和 SFs_emissions (模板)
+    sf6_to_sfs_mapping = {
+        'SF6_emissions': 'SFs_emissions'
+    }
+
+    for var_name in scope1_emission_vars:
+        if var_name in context and context[var_name]:
+            formatted_items = []
+            for item in context[var_name]:
+                formatted_item = item.copy()
+
+                # 为每个排放量字段应用格式化
+                for field in scope1_emission_fields:
+                    if field in item:
+                        original_value = item[field]
+                        # 应用格式化：保留2位小数，添加千分位符
+                        # format_number(0) 返回 "0.00"，format_number(1234567.89) 返回 "1,234,567.89"
+                        formatted_value = format_number(original_value) if original_value is not None else '0.00'
+                        formatted_item[field] = formatted_value
+
+                        # 特殊处理：SF6_emissions 同时映射为 SFs_emissions（模板兼容）
+                        if field == 'SF6_emissions':
+                            formatted_item['SFs_emissions'] = formatted_value
+
+                formatted_items.append(formatted_item)
+
+            formatted_context[var_name] = formatted_items
+            print(f"[范围一排放] 已格式化 {var_name}: {len(formatted_items)} 行数据")
+        else:
+            # 如果变量不存在或为空，初始化为空列表
+            formatted_context[var_name] = []
+
+    # ========== 范围一排放格式化结束 ==========
+
     # 添加中文数字映射（用于自动编号）
     formatted_context['cn_nums'] = {
         1: '一', 2: '二', 3: '三', 4: '四', 5: '五',
@@ -266,10 +509,11 @@ def generate_report_from_xlsx(
     print("开始生成碳盘查报告（纯xlsx，动态读取）")
     print("=" * 50)
 
-    # 1. 使用 data_reader 的动态读取方法
+    # 1. 使用 data_reader 的协议驱动方法（重构版）
     print(f"\n[步骤1] 从 {xlsx_path} 动态提取数据...")
     reader = ExcelDataReader(xlsx_path)
-    context = reader.extract_data_from_xlsx_dynamic()
+    context = reader.get_all_context()  # 重构后使用 get_all_context()
+    reader.close()  # 重构后需要手动关闭工作簿
 
     # 打印提取的关键数据
     print("\n提取的关键数据:")
@@ -298,15 +542,25 @@ def generate_report_from_xlsx(
     
     # 注册自定义 Jinja2 过滤器
     from jinja2 import Environment
+    from jinja2_filters import format_number, format_emission, register_filters_to_template
+
     env = Environment()
     env.filters['cn_num'] = to_chinese_num
+    env.filters['format_number'] = format_number
+    env.filters['format_emission'] = format_emission
     template.jinja_env = env
+
+    print("[渲染] 已注册过滤器: cn_num, format_number, format_emission")
     
     template.render(render_context)
 
     # 5. 保存报告
     print(f"\n[步骤5] 保存报告到: {output_path}")
     template.save(output_path)
+
+    # 5.5. 检查模板渲染后的数据（调试用）
+    print(f"\n[步骤5.5] 检查模板渲染后的数据...")
+    check_template_rendering(output_path)
 
     # 6. 统一公司简介和经营范围的段落格式
     print(f"\n[步骤6] 统一段落格式...")
@@ -370,11 +624,107 @@ def generate_report_from_xlsx(
     doc.save(output_path)
     print("空类别表格清理完成")
 
+    # 9.5. 检查合并前的表格数据
+    print(f"\n[步骤9.5] 检查合并前的表格数据...")
+    check_table_before_merge(output_path)
+
+    # 10. 使用 XML vMerge 方法合并表格中的纵向单元格（针对表1和表2）
+    print(f"\n[步骤10] 使用 XML vMerge 方法合并表格中的纵向单元格...")
+
+    # 处理表1（doc.tables[0]）
+    if len(doc.tables) >= 1:
+        table1 = doc.tables[0]
+        print(f"  处理表1（表格索引0）...")
+        try:
+            merge_vertical_cells(table1, 0)
+        except Exception as e:
+            print(f"  处理表1时出错: {e}")
+            import traceback
+            traceback.print_exc()
+
+    # 处理表2（doc.tables[1]）
+    if len(doc.tables) >= 2:
+        table2 = doc.tables[1]
+        print(f"  处理表2（表格索引1）...")
+        try:
+            merge_vertical_cells(table2, 0)
+        except Exception as e:
+            print(f"  处理表2时出错: {e}")
+            import traceback
+            traceback.print_exc()
+
+    doc.save(output_path)
+    print("表格纵向单元格合并完成（XML vMerge 方法）")
+
+    # 10.5. 合并其他表格中的纵向单元格（XML方法）- 范围三类别表格
+    print(f"\n[步骤10.5] 合并范围三类别表格的纵向单元格（XML方法）...")
+    merge_other_tables_vertical_cells(doc, context)
+
+    doc.save(output_path)
+    print("范围三类别表格纵向单元格合并完成（XML方法）")
+
     print("\n" + "=" * 50)
     print(f"报告生成成功: {output_path}")
     print("=" * 50)
 
     return output_path
+
+
+def check_template_rendering(doc_path):
+    """
+    检查模板渲染后的数据填充情况
+    """
+    from docx import Document
+
+    try:
+        doc = Document(doc_path)
+
+        # 检查表格0
+        if len(doc.tables) > 0:
+            table = doc.tables[0]
+            print(f"  表格0大小: {len(table.rows)} 行 x {len(table.columns)} 列")
+
+            # 显示前5行的类别列数据
+            print(f"  表格0第一列前5行:")
+            for row_idx in range(min(5, len(table.rows))):
+                cell_text = table.rows[row_idx].cells[0].text.strip()
+                print(f"    第{row_idx}行: '{cell_text}'")
+
+        # 检查 scope1 排放数据
+        print(f"  scope1_stationary_combustion_emissions_items 前3条数据:")
+        reader = ExcelDataReader('test_data.xlsx')
+        data = reader.get_all_context()
+        scope1_items = data.get('scope1_stationary_combustion_emissions_items', [])
+        for i, item in enumerate(scope1_items[:3]):
+            print(f"    {i+1}. category='{item.get('category')}', emission_source='{item.get('emission_source')}'")
+        reader.close()
+
+    except Exception as e:
+        print(f"  检查时出错: {e}")
+
+
+def check_table_before_merge(doc_path):
+    """
+    检查合并前的表格数据
+    """
+    from docx import Document
+
+    try:
+        doc = Document(doc_path)
+
+        if len(doc.tables) > 0:
+            table = doc.tables[0]
+            print(f"  表格0大小: {len(table.rows)} 行 x {len(table.columns)} 列")
+
+            # 检查前3行的数据
+            print(f"  前3行数据:")
+            for row_idx in range(min(3, len(table.rows))):
+                col0_text = table.rows[row_idx].cells[0].text.strip()
+                col1_text = table.rows[row_idx].cells[1].text.strip()
+                print(f"    第{row_idx}行: 列0='{col0_text}', 列1='{col1_text}'")
+
+    except Exception as e:
+        print(f"  检查时出错: {e}")
 
 
 def find_table_by_content(doc, search_keywords):
@@ -391,9 +741,18 @@ def find_table_by_content(doc, search_keywords):
     for idx, table in enumerate(doc.tables):
         # 获取表格中所有文本
         table_text = ""
-        for row in table.rows:
-            for cell in row.cells:
-                table_text += cell.text + " "
+        try:
+            # 直接访问XML元素，避免python-docx的导航问题
+            for row in table._element.tr_lst:
+                for tc in row.tc_lst:
+                    # 获取单元格文本
+                    for p in tc.p_lst:
+                        for r in p.r_lst:
+                            for t in r.t_lst:
+                                table_text += t.text + " "
+        except Exception as e:
+            # 如果遍历出错（如合并单元格），跳过该表格
+            continue
 
         # 检查是否包含任一关键词
         for keyword in search_keywords:
@@ -662,6 +1021,590 @@ def clean_empty_category_tables(doc, context):
 
     print(f"  彻底删除完成，共删除 {deleted_count} 个元素")
     print(f"  包括标题段落、单位段落、表格和孤立单位段落")
+
+
+def merge_vertical_cells(table, col_idx):
+    """
+    纵向合并表格指定列中内容相同的相邻单元格
+
+    使用底层 XML 操作，正确设置 vMerge 属性来实现合并。
+    直接访问 XML 元素，避免 python-docx 的导航问题。
+
+    Args:
+        table: python-docx 表格对象
+        col_idx: 要处理的列索引（从0开始）
+
+    Returns:
+        合并的单元格数量
+    """
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+
+    if col_idx >= len(table.columns):
+        print(f"  警告：列索引 {col_idx} 超出表格范围（表格共 {len(table.columns)} 列）")
+        return 0
+
+    merged_count = 0
+    rows_count = len(table.rows)
+
+    # 跳过表头行，从第1行开始处理（索引1）
+    start_row = 1
+
+    # 第一步：直接从 XML 读取所有行的文本内容
+    print(f"  开始识别合并组（总行数：{rows_count}，从行{start_row}开始）...")
+
+    # 获取表格的 XML 元素
+    table_element = table._element
+    tr_lst = table_element.tr_lst
+
+    # 存储每行的文本内容
+    row_texts = []
+
+    for row_idx in range(len(tr_lst)):
+        if row_idx < start_row:
+            # 跳过表头行
+            row_texts.append("")
+            continue
+
+        try:
+            tr = tr_lst[row_idx]
+            tc_lst = tr.tc_lst
+
+            if col_idx >= len(tc_lst):
+                print(f"  警告：行{row_idx}的列索引{col_idx}超出范围")
+                row_texts.append("")
+                continue
+
+            tc = tc_lst[col_idx]
+
+            # 获取单元格文本
+            cell_text = ""
+            for p in tc.p_lst:
+                for r in r_lst if (r_lst := p.r_lst) else []:
+                    for t in t_lst if (t_lst := r.t_lst) else []:
+                        cell_text += t.text
+
+            cell_text = cell_text.strip()
+            row_texts.append(cell_text)
+        except Exception as e:
+            print(f"  警告：读取行{row_idx}时出错: {e}")
+            row_texts.append("")
+
+    # 第二步：识别需要合并的单元格组
+    merge_groups = []
+    group_start = start_row
+    current_value = None
+
+    for row_idx in range(start_row, rows_count):
+        cell_text = row_texts[row_idx] if row_idx < len(row_texts) else ""
+
+        # 初始化当前值（第一行）
+        if current_value is None:
+            current_value = cell_text
+            group_start = row_idx
+            text_preview = cell_text[:40] if cell_text else ""
+            print(f"  行{row_idx}: 初始化，内容=\"{text_preview}\"")
+            continue
+
+        # 如果当前单元格内容与前一单元格相同，继续累积
+        if cell_text == current_value and cell_text != "":
+            continue
+
+        # 内容不同或遇到空值，记录之前的合并组
+        if row_idx - 1 > group_start:
+            merge_groups.append((group_start, row_idx - 1))
+            value_preview = current_value[:40] if current_value else ""
+            print(f"  识别合并组: 行{group_start}-{row_idx-1} (共{row_idx-1-group_start}行), 内容=\"{value_preview}\"")
+
+        # 开始新的合并组
+        current_value = cell_text
+        group_start = row_idx
+        if cell_text:
+            text_preview = cell_text[:40] if cell_text else ""
+            print(f"  行{row_idx}: 新组开始，内容=\"{text_preview}\"")
+
+    # 处理最后一组
+    if rows_count - 1 > group_start:
+        merge_groups.append((group_start, rows_count - 1))
+        value_preview = current_value[:40] if current_value else ""
+        print(f"  识别合并组: 行{group_start}-{rows_count-1} (共{rows_count-1-group_start}行), 内容=\"{value_preview}\"")
+
+    print(f"  总共识别到 {len(merge_groups)} 个合并组")
+
+    # 第三步：执行合并操作（直接操作 XML）
+    print(f"  开始执行合并操作，共 {len(merge_groups)} 个合并组...")
+
+    for group_start, group_end in merge_groups:
+        if group_end <= group_start:
+            print(f"  跳过无效合并组: 行{group_start}-{group_end}")
+            continue
+
+        print(f"  处理合并组: 行{group_start}-{group_end} (共{group_end-group_start}行)")
+
+        try:
+            # 获取顶部单元格的 XML 元素
+            tr_start = tr_lst[group_start]
+            tc_lst_start = tr_start.tc_lst
+
+            if col_idx >= len(tc_lst_start):
+                print(f"    警告：列索引{col_idx}超出范围")
+                continue
+
+            tc_start = tc_lst_start[col_idx]
+
+            # 保存顶部单元格的文本内容
+            merged_text = row_texts[group_start] if group_start < len(row_texts) else ""
+            text_preview = merged_text[:40] if merged_text else ""
+            print(f"    顶部单元格（行{group_start}）内容: \"{text_preview}\"")
+
+            # 设置顶部单元格的 vMerge 属性为 "restart"
+            tc_pr = tc_start.get_or_add_tcPr()
+            for old_vmerge in tc_pr.findall(qn('w:vMerge')):
+                tc_pr.remove(old_vmerge)
+            v_merge = OxmlElement('w:vMerge')
+            v_merge.set(qn('w:val'), 'restart')
+            tc_pr.append(v_merge)
+
+            # 验证vMerge属性是否设置成功
+            verify_vm = tc_pr.find(qn('w:vMerge'))
+            verify_val = verify_vm.get(qn('w:val')) if verify_vm is not None else 'not found'
+            print(f"    设置行{group_start} vMerge=\"restart\" (验证: {verify_val})")
+
+            # 处理其他单元格（设置为 "continue"）
+            for row_idx in range(group_start + 1, group_end + 1):
+                if row_idx >= len(tr_lst):
+                    break
+
+                try:
+                    tr = tr_lst[row_idx]
+                    tc_lst = tr.tc_lst
+
+                    if col_idx >= len(tc_lst):
+                        continue
+
+                    tc = tc_lst[col_idx]
+
+                    # 清空被合并单元格的内容
+                    for p in tc.p_lst:
+                        # 移除所有 run 元素
+                        for r in p.r_lst[:]:
+                            p.remove(r)
+
+                    # 设置 vMerge 属性为 "continue"
+                    merge_tc_pr = tc.get_or_add_tcPr()
+                    for old_vmerge in merge_tc_pr.findall(qn('w:vMerge')):
+                        merge_tc_pr.remove(old_vmerge)
+                    continue_vmerge = OxmlElement('w:vMerge')
+                    continue_vmerge.set(qn('w:val'), 'continue')
+                    merge_tc_pr.append(continue_vmerge)
+
+                    merged_count += 1
+                except Exception as e:
+                    print(f"    警告：处理行{row_idx}时出错: {e}")
+
+            print(f"    设置行{group_start+1}-{group_end} vMerge=\"continue\" (共{group_end-group_start}行)")
+
+            # 设置顶部单元格的内容
+            # 清空现有内容
+            for p in tc_start.p_lst[:]:
+                # 移除所有段落（除了保留一个）
+                if len(tc_start.p_lst) > 1:
+                    tc_start.remove(p)
+
+            # 确保至少有一个段落
+            if len(tc_start.p_lst) == 0:
+                from docx.oxml import parse_xml
+                new_p = parse_xml(r'<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>')
+                tc_start.append(new_p)
+
+            # 设置内容到第一个段落
+            p = tc_start.p_lst[0]
+            if merged_text:
+                # 清空现有 run
+                for r in p.r_lst[:]:
+                    p.remove(r)
+
+                # 添加新的 run 和 text
+                from docx.oxml import parse_xml
+                new_r = parse_xml(r'<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:t xml:space="preserve"></w:t></w:r>')
+                t_element = new_r.find(qn('w:t'))
+                if t_element is not None:
+                    t_element.text = merged_text
+                p.append(new_r)
+
+                content_preview = merged_text[:40] if merged_text else ""
+                print(f"    设置行{group_start}内容: \"{content_preview}\"")
+
+                # 验证内容是否设置成功
+                verify_text = ""
+                for r in p.r_lst:
+                    for t in t_lst if (t_lst := r.t_lst) else []:
+                        verify_text += t.text
+                verify_preview = verify_text[:40] if verify_text else ""
+                print(f"    验证行{group_start}内容: \"{verify_preview}\"")
+            else:
+                print(f"    [警告] merged_text 为空，跳过内容设置")
+
+            # 设置合并后单元格的对齐方式
+            try:
+                # 验证vMerge属性在设置对齐方式之前是否仍然存在
+                tc_pr_check = tc_start.get_or_add_tcPr()
+                vmerge_check = tc_pr_check.find(qn('w:vMerge'))
+                vmerge_val_check = vmerge_check.get(qn('w:val')) if vmerge_check is not None else 'None'
+                print(f"    设置对齐方式前vMerge验证: vMerge=\"{vmerge_val_check}\"")
+
+                # 垂直居中对齐
+                tc_pr = tc_start.get_or_add_tcPr()
+                v_align = tc_pr.find(qn('w:vAlign'))
+                if v_align is None:
+                    v_align = OxmlElement('w:vAlign')
+                    v_align.set(qn('w:val'), 'center')
+                    tc_pr.append(v_align)
+
+                # 段落居中对齐
+                jc = OxmlElement('w:jc')
+                jc.set(qn('w:val'), 'center')
+                p_pr = p.get_or_add_pPr()
+                p_pr.append(jc)
+
+                # 验证vMerge属性在设置对齐方式后是否仍然存在
+                vmerge_check2 = tc_pr.find(qn('w:vMerge'))
+                vmerge_val_check2 = vmerge_check2.get(qn('w:val')) if vmerge_check2 is not None else 'None'
+                print(f"    设置对齐方式后vMerge验证: vMerge=\"{vmerge_val_check2}\"")
+            except Exception as e:
+                print(f"    设置单元格对齐方式时出错: {e}")
+
+        except Exception as e:
+            print(f"    处理合并组时出错: {e}")
+            import traceback
+            traceback.print_exc()
+
+    print(f"  第 {col_idx} 列纵向合并完成，合并了 {merged_count} 个单元格")
+    return merged_count
+
+
+def merge_table_cells(table, col_idx):
+    """
+    纵向合并相同内容的单元格并居中（使用 XML vMerge 方法）
+
+    使用 XML vMerge 属性进行单元格合并，这种方法更可靠。
+    在合并前先清除所有现有的 vMerge 属性，避免干扰。
+
+    Args:
+        table: python-docx 表格对象
+        col_idx: 要处理的列索引（从0开始）
+
+    Returns:
+        合并的单元格数量
+    """
+    from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+
+    rows = table.rows
+    if len(rows) < 2:
+        return 0
+
+    merged_count = 0
+
+    # 跳过表头行，从第1行开始（索引1）
+    # 假设第0行是表头，不需要合并
+    if len(rows) < 3:
+        return 0
+
+    # 第一步：清除所有现有的 vMerge 属性
+    for row in rows:
+        if col_idx < len(row.cells):
+            cell = row.cells[col_idx]
+            tc_pr = cell._element.get_or_add_tcPr()
+            # 移除所有 vMerge 属性
+            for old_vmerge in tc_pr.findall(qn('w:vMerge')):
+                tc_pr.remove(old_vmerge)
+
+    # 第二步：收集所有单元格的文本内容
+    cell_texts = []
+    for row in rows[1:]:  # 跳过表头
+        if col_idx < len(row.cells):
+            cell = row.cells[col_idx]
+            text = cell.text.strip()
+            cell_texts.append(text)
+
+    # 第三步：使用组检测逻辑，识别需要合并的单元格组
+    merge_groups = []
+    start_idx = 0
+    current_text = cell_texts[0] if cell_texts else ""
+
+    for i in range(1, len(cell_texts)):
+        if cell_texts[i] == current_text and current_text != "":
+            # 继续累积，等待发现不同的内容
+            continue
+        else:
+            # 内容不同或遇到空值，记录之前的组
+            if i - 1 > start_idx:
+                merge_groups.append((start_idx, i - 1))
+            # 开始新的组
+            current_text = cell_texts[i]
+            start_idx = i
+
+    # 处理最后一组
+    if len(cell_texts) - 1 > start_idx:
+        merge_groups.append((start_idx, len(cell_texts) - 1))
+
+    # 调试输出
+    print(f"  识别到 {len(merge_groups)} 个合并组:")
+    for i, (group_start, group_end) in enumerate(merge_groups):
+        print(f"    组{i+1}: 行 {group_start+1}-{group_end+1} (共 {group_end-group_start+1} 行), 内容=\"{cell_texts[group_start][:30]}\"")
+
+    # 第四步：使用 XML vMerge 属性进行合并
+    for group_start, group_end in merge_groups:
+        if group_end > group_start:
+            try:
+                # 获取起始单元格（在数据行中的索引，需要加1因为跳过了表头）
+                start_row_idx = group_start + 1
+                start_cell = rows[start_row_idx].cells[col_idx]
+                start_cell_element = start_cell._element
+
+                # 保存起始单元格的文本内容
+                merged_text = cell_texts[group_start]
+
+                print(f"  合并组: 行{group_start+1}-{group_end+1} (共{group_end-group_start+1}行), 内容前30字符=\"{merged_text[:30]}\"")
+
+                # 先设置 vMerge 属性（在清空内容之前）
+                # 设置起始单元格的 vMerge 属性为 "restart"
+                tc_pr = start_cell_element.get_or_add_tcPr()
+                v_merge = OxmlElement('w:vMerge')
+                v_merge.set(qn('w:val'), 'restart')
+                tc_pr.append(v_merge)
+
+                # 设置其他单元格的 vMerge 属性为 "continue"
+                for row_offset in range(1, group_end - group_start + 1):
+                    curr_row_idx = start_row_idx + row_offset
+                    curr_cell = rows[curr_row_idx].cells[col_idx]
+                    curr_cell_element = curr_cell._element
+
+                    merge_tc_pr = curr_cell_element.get_or_add_tcPr()
+                    continue_vmerge = OxmlElement('w:vMerge')
+                    continue_vmerge.set(qn('w:val'), 'continue')
+                    merge_tc_pr.append(continue_vmerge)
+
+                    merged_count += 1
+
+                # 然后清空并设置内容（在设置 vMerge 之后）
+                # 清空所有要合并的单元格的内容（除了第一个）
+                for row_offset in range(1, group_end - group_start + 1):
+                    curr_row_idx = start_row_idx + row_offset
+                    curr_cell = rows[curr_row_idx].cells[col_idx]
+                    for paragraph in curr_cell.paragraphs:
+                        paragraph.text = ""
+
+                # 在起始单元格中设置内容（不清空，只确保有内容）
+                if merged_text:
+                    # 检查起始单元格是否已有内容
+                    current_text = start_cell.text.strip()
+                    if not current_text or current_text != merged_text:
+                        # 清空并重新设置
+                        for paragraph in start_cell.paragraphs:
+                            paragraph.text = ""
+                        # 确保至少有一个段落
+                        if not start_cell.paragraphs:
+                            start_cell.add_paragraph()
+                        start_cell.paragraphs[0].text = merged_text
+
+                print(f"    完成: vMerge=\"restart\" 设置于行{start_row_idx}")
+            except Exception as e:
+                print(f"  合并单元格组时出错（行 {group_start+1}-{group_end+1}）: {e}")
+                import traceback
+                traceback.print_exc()
+
+    # 第五步：设置所有单元格的对齐方式（居中）
+    for row in table.rows:
+        if col_idx < len(row.cells):
+            cell = row.cells[col_idx]
+            try:
+                # 垂直居中对齐
+                cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+                # 段落居中对齐
+                for paragraph in cell.paragraphs:
+                    paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            except Exception as e:
+                print(f"  设置单元格对齐方式时出错: {e}")
+
+    print(f"  第 {col_idx} 列物理合并完成，合并了 {merged_count} 个单元格")
+    return merged_count
+
+    # 设置所有单元格的对齐方式（居中）
+    for row in table.rows:
+        if col_idx < len(row.cells):
+            cell = row.cells[col_idx]
+            try:
+                # 垂直居中对齐
+                cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+                # 段落居中对齐
+                for paragraph in cell.paragraphs:
+                    paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            except Exception as e:
+                print(f"  设置单元格对齐方式时出错: {e}")
+
+    print(f"  第 {col_idx} 列物理合并完成，合并了 {merged_count} 个单元格")
+    return merged_count
+
+
+def merge_other_tables_vertical_cells(doc, context):
+    """
+    处理范围三类别表格的纵向单元格合并（XML方法）
+
+    仅处理范围三各类别的详细表格，不包含表1和表2。
+
+    Args:
+        doc: Word文档对象
+        context: 数据上下文字典（用于判断哪些表格有数据）
+    """
+    # 范围三类别名称映射
+    category_names = {
+        1: "购买的商品和服务",
+        2: "资本商品",
+        3: "燃料和能源相关活动",
+        4: "上游运输和配送",
+        5: "运营中产生的废弃物",
+        6: "员工商务旅行",
+        7: "员工通勤",
+        8: "上游租赁资产",
+        9: "下游运输和配送",
+        10: "销售产品的加工",
+        11: "销售产品的使用",
+        12: "寿命终结处理",
+        13: "下游租赁资产",
+        14: "特许经营",
+        15: "投资"
+    }
+
+    total_merged = 0
+
+    # 记录已处理的表格索引，避免重复处理表1和表2
+    processed_tables = set()
+
+    # 对有数据的范围三类别表格进行处理
+    for cat_num in range(1, 16):
+        detail_items = context.get(f'scope3_category{cat_num}', [])
+        emission_value = context.get(f'scope_3_category_{cat_num}_emissions', 0)
+
+        # 只处理有数据的类别
+        if (detail_items and len(detail_items) > 0) or (emission_value and emission_value > 0):
+            category_name = category_names.get(cat_num, "")
+
+            # 查找对应的表格
+            table_idx = find_table_by_content(doc, [category_name, f'类别{cat_num}'])
+
+            # 跳过表1和表2（索引0和1）以及已处理的表格
+            if table_idx is not None and table_idx < len(doc.tables) and table_idx not in processed_tables:
+                # 跳过表1和表2
+                if table_idx < 2:
+                    print(f"  跳过范围三类别{cat_num}表格（{category_name}，表格索引：{table_idx}），这是主表格")
+                    continue
+
+                table = doc.tables[table_idx]
+                print(f"  找到范围三类别{cat_num}表格（{category_name}，表格索引：{table_idx}）")
+                processed_tables.add(table_idx)
+
+                try:
+                    merged = merge_vertical_cells(table, 0)
+                    total_merged += merged
+                except Exception as e:
+                    print(f"  处理范围三类别{cat_num}表格时出错: {e}")
+                    import traceback
+                    traceback.print_exc()
+
+    print(f"  范围三类别表格合并总计：合并了 {total_merged} 个单元格")
+
+
+def merge_table_vertical_cells(doc, context):
+    """
+    处理文档中表格的纵向单元格合并
+
+    针对文档中的"表1"和"表2"（即范围一、二、三的明细表），
+    调用 merge_vertical_cells 处理第一列（类别列）。
+
+    Args:
+        doc: Word文档对象
+        context: 数据上下文字典（用于判断哪些表格有数据）
+    """
+    # 定义要处理的表格标识关键词
+    table_keywords = [
+        # 表1：范围一直接排放源表格
+        {'keywords': ['范围一', '直接', '排放源'], 'name': '表1（范围一）'},
+        # 表2：范围二三间接排放源表格
+        {'keywords': ['范围二', '范围三', '间接', '排放源'], 'name': '表2（范围二三）'}
+    ]
+
+    total_merged = 0
+
+    for table_info in table_keywords:
+        # 根据关键词查找表格
+        table_idx = find_table_by_content(doc, table_info['keywords'])
+
+        if table_idx is not None and table_idx < len(doc.tables):
+            table = doc.tables[table_idx]
+            print(f"  找到{table_info['name']}（表格索引：{table_idx}）")
+
+            # 处理第一列（类别列）的纵向合并
+            try:
+                merged = merge_vertical_cells(table, 0)
+                total_merged += merged
+            except Exception as e:
+                print(f"  处理{table_info['name']}时出错: {e}")
+                import traceback
+                traceback.print_exc()
+        else:
+            print(f"  未找到{table_info['name']}，跳过")
+
+    # 处理范围三各类别的详细表格（如果有）
+    # 范围三类别名称映射
+    category_names = {
+        1: "购买的商品和服务",
+        2: "资本商品",
+        3: "燃料和能源相关活动",
+        4: "上游运输和配送",
+        5: "运营中产生的废弃物",
+        6: "员工商务旅行",
+        7: "员工通勤",
+        8: "上游租赁资产",
+        9: "下游运输和配送",
+        10: "销售产品的加工",
+        11: "销售产品的使用",
+        12: "寿命终结处理",
+        13: "下游租赁资产",
+        14: "特许经营",
+        15: "投资"
+    }
+
+    # 对有数据的范围三类别表格进行处理
+    for cat_num in range(1, 16):
+        detail_items = context.get(f'scope3_category{cat_num}', [])
+        emission_value = context.get(f'scope_3_category_{cat_num}_emissions', 0)
+
+        # 只处理有数据的类别
+        if (detail_items and len(detail_items) > 0) or (emission_value and emission_value > 0):
+            category_name = category_names.get(cat_num, "")
+
+            # 查找对应的表格
+            table_idx = find_table_by_content(doc, [category_name, f'类别{cat_num}'])
+
+            if table_idx is not None and table_idx < len(doc.tables):
+                table = doc.tables[table_idx]
+                print(f"  找到范围三类别{cat_num}表格（表格索引：{table_idx}）")
+
+                # 处理第一列（类别列）的纵向合并
+                try:
+                    merged = merge_vertical_cells(table, 0)
+                    total_merged += merged
+                except Exception as e:
+                    print(f"  处理范围三类别{cat_num}表格时出错: {e}")
+
+    print(f"  表格纵向合并总计：合并了 {total_merged} 个单元格")
+
 
 if __name__ == "__main__":
     import sys
