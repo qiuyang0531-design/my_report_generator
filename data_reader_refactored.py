@@ -70,6 +70,7 @@ class TableProtocol:
     min_match_ratio: float = 0.3  # 最小匹配度（可选关键词）
     post_process: Optional[Callable] = None  # 后处理函数
     sheet_name_patterns: List[str] = field(default_factory=list)  # 工作表名称匹配模式
+    header_rows_to_check: int = 2  # 表头行检查数量（默认检查2行）
 
 
 # ==================== 后处理函数 ====================
@@ -217,15 +218,15 @@ TABLE_PROTOCOLS: Dict[str, TableProtocol] = {
     'ActivitySummaryProtocol': TableProtocol(
         name='活动数据汇总表',
         description='基于位置的活动数据汇总表',
-        required_keywords={'序号', '排放源'},
+        required_keywords={'编号', '排放源'},  # 修正：实际表头是"编号"不是"序号"
         optional_keywords={'GHG', '基于位置', 'CO2', 'CH4', 'N2O', '报告边界', '活动数据'},
         field_mappings={
-            'number': FieldMapping('序号', '', 'str'),
+            'number': FieldMapping('编号', '', 'str', ['序号']),  # 修正：实际表头是"编号"
             'category': FieldMapping('GHG排放类别', '', 'str'),
             'emission_source': FieldMapping('排放源', '', 'str'),
             'report_boundary': FieldMapping('报告边界', '', 'str'),
-            'activity_data': FieldMapping('活动数据', 0, 'float'),
-            'unit': FieldMapping('单位', '', 'str'),
+            'activity_data': FieldMapping('活动数据', 0, 'float'),  # 主表头中的"活动数据"列
+            'unit': FieldMapping('计量单位', '', 'str'),  # 子表头中的"计量单位"列
             'CO2_emissions': FieldMapping('CO2', 0, 'float'),
             'CH4_emissions': FieldMapping('CH4', 0, 'float'),
             'N2O_emissions': FieldMapping('N2O', 0, 'float'),
@@ -233,26 +234,27 @@ TABLE_PROTOCOLS: Dict[str, TableProtocol] = {
             'PFCs_emissions': FieldMapping('PFCs', 0, 'float'),
             'SF6_emissions': FieldMapping('SF6', 0, 'float'),
             'NF3_emissions': FieldMapping('NF3', 0, 'float'),
-            'total_green_house_gas_emissions': FieldMapping('总计', 0, 'float'),
+            'total_green_house_gas_emissions': FieldMapping('总计', 0, 'float', ['总量']),
         },
         output_var='activity_summary_items',
         ffill_fields=['category'],
         min_match_ratio=0.2,  # 降低匹配度要求，因为活动数据汇总表的差异较大
         sheet_name_patterns=['活动数据汇总表', '位置'],  # 基于位置的活动数据汇总表
+        header_rows_to_check=3,  # 活动数据汇总表需要检查3行表头
     ),
 
     'ActivitySummaryMarketProtocol': TableProtocol(
         name='活动数据汇总表（市场法）',
         description='基于市场的活动数据汇总表',
-        required_keywords={'序号', '排放源'},
+        required_keywords={'编号', '排放源'},  # 修正：实际表头是"编号"不是"序号"
         optional_keywords={'GHG', '基于市场', 'CO2', 'CH4', 'N2O', '报告边界', '活动数据'},
         field_mappings={
-            'number': FieldMapping('序号', '', 'str'),
+            'number': FieldMapping('编号', '', 'str', ['序号']),  # 修正：实际表头是"编号"
             'category': FieldMapping('GHG排放类别', '', 'str'),
             'emission_source': FieldMapping('排放源', '', 'str'),
             'report_boundary': FieldMapping('报告边界', '', 'str'),
-            'activity_data': FieldMapping('活动数据', 0, 'float'),
-            'unit': FieldMapping('单位', '', 'str'),
+            'activity_data': FieldMapping('活动数据', 0, 'float'),  # 主表头中的"活动数据"列
+            'unit': FieldMapping('计量单位', '', 'str'),  # 子表头中的"计量单位"列
             'CO2_emissions': FieldMapping('CO2', 0, 'float'),
             'CH4_emissions': FieldMapping('CH4', 0, 'float'),
             'N2O_emissions': FieldMapping('N2O', 0, 'float'),
@@ -260,12 +262,13 @@ TABLE_PROTOCOLS: Dict[str, TableProtocol] = {
             'PFCs_emissions': FieldMapping('PFCs', 0, 'float'),
             'SF6_emissions': FieldMapping('SF6', 0, 'float'),
             'NF3_emissions': FieldMapping('NF3', 0, 'float'),
-            'total_green_house_gas_emissions': FieldMapping('总计', 0, 'float'),
+            'total_green_house_gas_emissions': FieldMapping('总计', 0, 'float', ['总量']),
         },
         output_var='activity_summary_market_items',
         ffill_fields=['category'],
         min_match_ratio=0.2,  # 降低匹配度要求，因为活动数据汇总表的差异较大
         sheet_name_patterns=['活动数据汇总表', '市场'],  # 基于市场的活动数据汇总表
+        header_rows_to_check=3,  # 活动数据汇总表需要检查3行表头
     ),
 }
 
@@ -452,7 +455,7 @@ class ProtocolExtractor:
         header_cells = {}
 
         # 收集表头单元格（支持多行表头）
-        rows_to_check = [header_row, header_row + 1]
+        rows_to_check = list(range(header_row, min(header_row + protocol.header_rows_to_check, sheet.max_row + 1)))
         for row_idx in rows_to_check:
             if row_idx > sheet.max_row:
                 continue
@@ -462,23 +465,44 @@ class ProtocolExtractor:
                     if value and value not in header_cells:
                         header_cells[value] = cell.column - 1
 
+        # 活动数据汇总表的排放量字段特殊处理：使用固定列位置
+        is_activity_summary = protocol.name in ['活动数据汇总表', '活动数据汇总表（市场法）']
+        if is_activity_summary:
+            # 活动数据汇总表的排放量列固定位置（基于表格结构）
+            # CO2: Col 30, CH4: Col 31, N2O: Col 32, HFCs: Col 33
+            # PFCs: Col 34, SF6: Col 35, NF3: Col 36, 总计: Col 37
+            emission_column_map = {
+                'CO2_emissions': 29,  # Col 30 (0-based)
+                'CH4_emissions': 30,  # Col 31
+                'N2O_emissions': 31,  # Col 32
+                'HFCs_emissions': 32,  # Col 33
+                'PFCs_emissions': 33,  # Col 34
+                'SF6_emissions': 34,  # Col 35
+                'NF3_emissions': 35,  # Col 36
+                'total_green_house_gas_emissions': 36,  # Col 37
+            }
+
         # 为每个字段查找列
         for field_name, field_mapping in protocol.field_mappings.items():
-            # 精确匹配
-            if field_mapping.keyword in header_cells:
-                column_map[field_name] = header_cells[field_mapping.keyword]
+            # 活动数据汇总表的排放量字段：使用固定列位置
+            if is_activity_summary and field_name in emission_column_map:
+                column_map[field_name] = emission_column_map[field_name]
             else:
-                # 模糊匹配
-                for header_value in header_cells:
-                    if field_mapping.keyword in header_value or header_value in field_mapping.keyword:
-                        column_map[field_name] = header_cells[header_value]
-                        break
-                # 尝试备选关键词
-                if field_name not in column_map:
-                    for alt_keyword in field_mapping.alt_keywords:
-                        if alt_keyword in header_cells:
-                            column_map[field_name] = header_cells[alt_keyword]
+                # 常规匹配
+                if field_mapping.keyword in header_cells:
+                    column_map[field_name] = header_cells[field_mapping.keyword]
+                else:
+                    # 模糊匹配
+                    for header_value in header_cells:
+                        if field_mapping.keyword in header_value or header_value in field_mapping.keyword:
+                            column_map[field_name] = header_cells[header_value]
                             break
+                    # 尝试备选关键词
+                    if field_name not in column_map:
+                        for alt_keyword in field_mapping.alt_keywords:
+                            if alt_keyword in header_cells:
+                                column_map[field_name] = header_cells[alt_keyword]
+                                break
 
         return column_map
 
@@ -489,12 +513,27 @@ class ProtocolExtractor:
         """提取数据行"""
         data_items = []
 
+        # 活动数据汇总表的特殊处理：跳过子表头行
+        is_activity_summary = protocol.name in ['活动数据汇总表', '活动数据汇总表（市场法）']
+
         for row_idx in range(header_row + 1, sheet.max_row + 1):
             row = sheet[row_idx]
 
             # 检查空行
             if not any(cell.value is not None for cell in row):
                 continue
+
+            # 活动数据汇总表：跳过序号列非数字的行（子表头行）
+            if is_activity_summary and 'number' in protocol.field_mappings:
+                number_col_idx = column_map.get('number', 0)
+                if number_col_idx < len(row):
+                    number_cell = row[number_col_idx]
+                    # 如果序号列不是数字，跳过该行
+                    if number_cell.value is None or not isinstance(number_cell.value, (int, float)):
+                        try:
+                            float(number_cell.value)
+                        except (ValueError, TypeError):
+                            continue
 
             # 提取字段值
             item = {}
@@ -673,16 +712,80 @@ class ExcelDataReaderRefactored:
         # scope2_items 由 _extract_table1_table2_data() 从表1温室气体盘查表提取
         # 这里保留原有的 scope2_items，不覆盖为汇总行
 
-        # ========== 设置 activity_summary_location_items（向后兼容）==========
+        # ========== 设置活动数据汇总表（向后兼容模板）==========
         # activity_summary_items 现在是基于位置的数据
         # activity_summary_market_items 是基于市场的数据
-        if 'activity_summary_items' in result:
-            # 复制 activity_summary_items 到 activity_summary_location_items
-            result['activity_summary_location_items'] = result['activity_summary_items']
-            print(f"[后处理] activity_summary_location_items: {len(result['activity_summary_location_items'])} 行")
 
+        # 处理基于位置的活动数据汇总表
+        if 'activity_summary_items' in result:
+            # 字段映射：新版字段名 -> 模板期望的字段名
+            location_items = []
+            for item in result['activity_summary_items']:
+                mapped_item = {
+                    'number': item.get('number', ''),
+                    # GHG排放类别
+                    'emission_source_type_loc': item.get('category', ''),
+                    'emission_source_type_location_based': item.get('category', ''),
+                    # 排放源
+                    'emission_source_loc': item.get('emission_source', ''),
+                    'emission_source_location_based': item.get('emission_source', ''),
+                    # 报告边界
+                    'report_boundary_loc': item.get('report_boundary', ''),
+                    'report_boundary_location_based': item.get('report_boundary', ''),
+                    # 活动数据数值（模板期望的字段名）
+                    'act_summary_loc': item.get('activity_data', ''),
+                    'activity_data_location_based': item.get('activity_data', ''),
+                    # 活动数据单位（模板期望的字段名）
+                    'act_summary_loc_unit': item.get('unit', ''),
+                    'activity_data_unit_location_based': item.get('unit', ''),
+                }
+                # 排放量数据
+                for field_name in ['CO2_emissions', 'CH4_emissions', 'N2O_emissions',
+                                   'HFCs_emissions', 'PFCs_emissions', 'SF6_emissions',
+                                   'NF3_emissions', 'total_green_house_gas_emissions']:
+                    if field_name in item:
+                        mapped_item[field_name] = item[field_name]
+                location_items.append(mapped_item)
+
+            # 设置模板期望的变量名
+            result['act_summary_loc'] = location_items
+            result['activity_summary_location_items'] = location_items
+            print(f"[后处理] act_summary_loc (基于位置): {len(location_items)} 行")
+
+        # 处理基于市场的活动数据汇总表
         if 'activity_summary_market_items' in result:
-            print(f"[后处理] activity_summary_market_items: {len(result['activity_summary_market_items'])} 行")
+            # 字段映射：新版字段名 -> 模板期望的字段名
+            market_items = []
+            for item in result['activity_summary_market_items']:
+                mapped_item = {
+                    'number': item.get('number', ''),
+                    # GHG排放类别
+                    'emission_source_type_mar': item.get('category', ''),  # 简短版本（模板期望）
+                    'emission_source_type_market_based': item.get('category', ''),  # 完整版本（兼容）
+                    # 排放源
+                    'emission_source_mar': item.get('emission_source', ''),
+                    'emission_source_market_based': item.get('emission_source', ''),
+                    # 报告边界
+                    'report_boundary_mar': item.get('report_boundary', ''),
+                    'report_boundary_market_based': item.get('report_boundary', ''),
+                    # 活动数据数值（模板期望的字段名）
+                    'act_summary_mar': item.get('activity_data', ''),
+                    'activity_data_market_based': item.get('activity_data', ''),
+                    # 活动数据单位（模板期望的字段名）
+                    'act_summary_mar_unit': item.get('unit', ''),
+                    'activity_data_unit_market_based': item.get('unit', ''),
+                }
+                # 排放量数据
+                for field_name in ['CO2_emissions', 'CH4_emissions', 'N2O_emissions',
+                                   'HFCs_emissions', 'PFCs_emissions', 'SF6_emissions',
+                                   'NF3_emissions', 'total_green_house_gas_emissions']:
+                    if field_name in item:
+                        mapped_item[field_name] = item[field_name]
+                market_items.append(mapped_item)
+
+            # 设置模板期望的变量名
+            result['act_summary_mar'] = market_items
+            print(f"[后处理] act_summary_mar (基于市场): {len(market_items)} 行")
 
         # ========== 后处理：更新 Flags 标记 ==========
         result = self._update_flags(result)
