@@ -405,6 +405,86 @@ def prepare_context_with_formatting(context):
         formatted_context['mar_NF3_emissions_sum_formatted'] = '0.00'
         formatted_context['mar_total_green_house_gas_emissions_sum_formatted'] = '0.00'
 
+    # ========== 格式化排放因子汇总表 ==========
+    # 为 pro_ef_items 中的数值字段添加格式化处理
+    if 'pro_ef_items' in context and context['pro_ef_items']:
+        formatted_pro_ef_items = []
+        ef_fields_to_format = [
+            'ncv',                  # 低位发热量
+            'ox_rate',              # 氧化率
+            'ef_val',               # 计算值/排放系数
+            'CO2_emission_factor',  # CO2排放因子
+            'CH4_emission_factor',  # CH4排放因子
+            'N2O_emission_factor',  # N2O排放因子
+        ]
+
+        # 初始化汇总值（排放因子汇总表通常需要计算平均值的汇总）
+        ef_sums = {
+            'ncv': 0.0,
+            'ox_rate': 0.0,
+            'ef_val': 0.0,
+            'CO2_emission_factor': 0.0,
+            'CH4_emission_factor': 0.0,
+            'N2O_emission_factor': 0.0,
+        }
+        ef_count = 0  # 有效数据行计数
+
+        for item in context['pro_ef_items']:
+            formatted_item = item.copy()
+            is_valid_row = False  # 标记是否为有效数据行
+
+            # 为数值字段添加格式化版本
+            for field in ef_fields_to_format:
+                if field in item:
+                    original_value = item[field]
+                    # 尝试转换为浮点数进行汇总
+                    try:
+                        num_value = float(str(original_value).replace(',', '').replace(' ', '')) if original_value else 0
+                        if field in ef_sums:
+                            ef_sums[field] += num_value
+                            is_valid_row = True
+                    except (ValueError, TypeError):
+                        pass
+
+                    # 添加格式化版本（非空检查：确保输出 0.00 而不是空字符串）
+                    formatted_item[field] = format_number(original_value) if original_value else '0.00'
+
+            if is_valid_row:
+                ef_count += 1
+            formatted_pro_ef_items.append(formatted_item)
+
+        formatted_context['pro_ef_items'] = formatted_pro_ef_items
+        # 同步到旧变量名（向后兼容）
+        formatted_context['emission_factor_items'] = formatted_pro_ef_items
+        print(f"[排放因子汇总表] 已格式化 {len(formatted_pro_ef_items)} 行数据")
+
+        # 添加汇总行数据（排放因子汇总表通常显示平均值）
+        if ef_count > 0:
+            formatted_context['ef_ncv_sum_formatted'] = format_number(ef_sums['ncv'] / ef_count)
+            formatted_context['ef_ox_rate_sum_formatted'] = format_number(ef_sums['ox_rate'] / ef_count)
+            formatted_context['ef_ef_val_sum_formatted'] = format_number(ef_sums['ef_val'] / ef_count)
+            formatted_context['ef_CO2_emission_factor_sum_formatted'] = format_number(ef_sums['CO2_emission_factor'] / ef_count)
+            formatted_context['ef_CH4_emission_factor_sum_formatted'] = format_number(ef_sums['CH4_emission_factor'] / ef_count)
+            formatted_context['ef_N2O_emission_factor_sum_formatted'] = format_number(ef_sums['N2O_emission_factor'] / ef_count)
+        else:
+            formatted_context['ef_ncv_sum_formatted'] = '0.00'
+            formatted_context['ef_ox_rate_sum_formatted'] = '0.00'
+            formatted_context['ef_ef_val_sum_formatted'] = '0.00'
+            formatted_context['ef_CO2_emission_factor_sum_formatted'] = '0.00'
+            formatted_context['ef_CH4_emission_factor_sum_formatted'] = '0.00'
+            formatted_context['ef_N2O_emission_factor_sum_formatted'] = '0.00'
+        print(f"[排放因子汇总表] 汇总行计算完成（基于{ef_count}行有效数据）")
+    else:
+        formatted_context['pro_ef_items'] = []
+        formatted_context['emission_factor_items'] = []
+        # 设置空的汇总值
+        formatted_context['ef_ncv_sum_formatted'] = '0.00'
+        formatted_context['ef_ox_rate_sum_formatted'] = '0.00'
+        formatted_context['ef_ef_val_sum_formatted'] = '0.00'
+        formatted_context['ef_CO2_emission_factor_sum_formatted'] = '0.00'
+        formatted_context['ef_CH4_emission_factor_sum_formatted'] = '0.00'
+        formatted_context['ef_N2O_emission_factor_sum_formatted'] = '0.00'
+
     # ========== 格式化范围一直接排放源清册数据 ==========
     # 为 scope1 排放项中的数值字段添加格式化处理（2位小数 + 千分位符）
     # 确保零值显示为 "0.00" 而不是空字符串
@@ -493,7 +573,7 @@ def prepare_context_with_formatting(context):
 
 def generate_report_from_xlsx(
     xlsx_path="test_data.xlsx",
-    template_path="template.docx",
+    template_path="template_new.docx",
     output_path="carbon_report.docx"
 ):
     """

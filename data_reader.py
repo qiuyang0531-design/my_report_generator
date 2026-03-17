@@ -534,9 +534,28 @@ class ExcelDataReader:
         # ========== 新增：按类别分组 pro_ef_items ==========
         # 将 pro_ef_items 按类别分组，为三个独立的表格提供数据
         if 'pro_ef_items' in result and result['pro_ef_items']:
-            # 同时设置 emission_factor_items（用于 Tables 22-24）
-            result['emission_factor_items'] = result['pro_ef_items']
-            print(f"[协议读取] 设置 emission_factor_items: {len(result['emission_factor_items'])} 条")
+            # 为 emission_factor_items 添加字段映射（模板期望带 _dir 后缀的字段名）
+            mapped_ef_items = []
+            for item in result['pro_ef_items']:
+                mapped_item = item.copy()
+                # 添加模板期望的字段映射（表格22：排放因子汇总表）
+                mapped_item['emission_source_type_dir'] = item.get('category', '')
+                mapped_item['emission_source_dir'] = item.get('emission_source', '')
+                mapped_item['emission_facilities_dir'] = item.get('facility', '')
+                mapped_item['ncv_dir'] = item.get('ncv', '')
+                mapped_item['emission_unit_dir'] = item.get('unit', '')
+                mapped_item['emission_oa_dir'] = item.get('ox_rate', '')
+                # 基于热值排放系数（直接使用从协议读取的字段）
+                mapped_item['CO2_emission_cv_factor'] = item.get('CO2_emission_cv_factor', '')
+                mapped_item['CH4_emission_cv_factor'] = item.get('CH4_emission_cv_factor', '')
+                mapped_item['N2O_emission_cv_factor'] = item.get('N2O_emission_cv_factor', '')
+                # 排放因子（直接使用从协议读取的字段）
+                # CO2_emission_factor、CH4_emission_factor、N2O_emission_factor 已经在数据中
+                mapped_ef_items.append(mapped_item)
+
+            # 设置 emission_factor_items（用于 Tables 22-24）
+            result['emission_factor_items'] = mapped_ef_items
+            print(f"[协议读取] 设置 emission_factor_items: {len(result['emission_factor_items'])} 条（已添加字段映射）")
 
             # 按类别分组
             grouped_data = self._group_pro_ef_items_by_category(result['pro_ef_items'])

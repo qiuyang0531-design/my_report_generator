@@ -144,10 +144,14 @@ TABLE_PROTOCOLS: Dict[str, TableProtocol] = {
             'ncv': FieldMapping('低位发热量', 0, 'float'),
             'unit': FieldMapping('单位', '', 'str'),
             'ox_rate': FieldMapping('氧化率', 0, 'float'),
-            'ef_val': FieldMapping('计算值', 0, 'float', ['排放系数', '基于热值排放系数']),
-            'CO2_emission_factor': FieldMapping('CO2', 0, 'float'),
-            'CH4_emission_factor': FieldMapping('CH4', 0, 'float'),
-            'N2O_emission_factor': FieldMapping('N2O', 0, 'float'),
+            # 基于热值排放系数（CO2/CH4/N2O来自"基于热值排放系数"部分）
+            'CO2_emission_cv_factor': FieldMapping('CO2', 0, 'float', ['基于热值']),
+            'CH4_emission_cv_factor': FieldMapping('CH4', 0, 'float', ['基于热值']),
+            'N2O_emission_cv_factor': FieldMapping('N2O', 0, 'float', ['基于热值']),
+            # 排放因子（CO2/CH4/N2O来自"排放因子"部分）
+            'CO2_emission_factor': FieldMapping('CO2', 0, 'float', ['排放因子']),
+            'CH4_emission_factor': FieldMapping('CH4', 0, 'float', ['排放因子']),
+            'N2O_emission_factor': FieldMapping('N2O', 0, 'float', ['排放因子']),
         },
         output_var='pro_ef_items',
         ffill_fields=['category'],
@@ -467,6 +471,9 @@ class ProtocolExtractor:
 
         # 活动数据汇总表的排放量字段特殊处理：使用固定列位置
         is_activity_summary = protocol.name in ['活动数据汇总表', '活动数据汇总表（市场法）']
+        # 排放因子表的特殊处理：使用固定列位置区分两组 CO2/CH4/N2O
+        is_emission_factor = protocol.name == '排放因子表'
+
         if is_activity_summary:
             # 活动数据汇总表的排放量列固定位置（基于表格结构）
             # CO2: Col 30, CH4: Col 31, N2O: Col 32, HFCs: Col 33
@@ -481,11 +488,26 @@ class ProtocolExtractor:
                 'NF3_emissions': 35,  # Col 36
                 'total_green_house_gas_emissions': 36,  # Col 37
             }
+        elif is_emission_factor:
+            # 排放因子表的固定列位置
+            # 基于热值排放系数: CO2=Col9, CH4=Col10, N2O=Col11
+            # 排放因子: CO2=Col12, CH4=Col13, N2O=Col14
+            emission_column_map = {
+                'CO2_emission_cv_factor': 8,   # Col 9 (基于热值排放系数 CO2)
+                'CH4_emission_cv_factor': 9,   # Col 10 (基于热值排放系数 CH4)
+                'N2O_emission_cv_factor': 10,  # Col 11 (基于热值排放系数 N2O)
+                'CO2_emission_factor': 11,     # Col 12 (排放因子 CO2)
+                'CH4_emission_factor': 12,     # Col 13 (排放因子 CH4)
+                'N2O_emission_factor': 13,     # Col 14 (排放因子 N2O)
+            }
 
         # 为每个字段查找列
         for field_name, field_mapping in protocol.field_mappings.items():
             # 活动数据汇总表的排放量字段：使用固定列位置
             if is_activity_summary and field_name in emission_column_map:
+                column_map[field_name] = emission_column_map[field_name]
+            # 排放因子表的排放系数字段：使用固定列位置
+            elif is_emission_factor and field_name in emission_column_map:
                 column_map[field_name] = emission_column_map[field_name]
             else:
                 # 常规匹配
@@ -669,8 +691,12 @@ class ExcelDataReaderRefactored:
                 protocol = TABLE_PROTOCOLS[protocol_name]
                 output_var = protocol.output_var
 
-                # 提取数据
-                data_items = self.extractor.extract_from_sheet(sheet, protocol_name)
+                # 排放因子表特殊处理：多子表提取
+                if protocol_name == 'EmissionFactorProtocol' and '附表2-EF' in sheet_name:
+                    data_items = self._extract_emission_factor_subtables(sheet)
+                else:
+                    # 提取数据
+                    data_items = self.extractor.extract_from_sheet(sheet, protocol_name)
 
                 # 存储结果
                 result[output_var] = data_items
@@ -682,17 +708,78 @@ class ExcelDataReaderRefactored:
                 result[protocol.output_var] = []
 
         # ========== 后处理：类别分组 ==========
-        # 1. 处理排放因子表的类别分组
+        # 1. 处理排放因子表的类别分组 - 分别创建三个表格的数据
         if 'pro_ef_items' in result and result['pro_ef_items']:
-            # 向后兼容：设置 emission_factor_items
-            result['emission_factor_items'] = result['pro_ef_items']
+            # 按子表类型分组数据
+            combustion_items = []  # 表格22：燃烧排放因子表（固定燃烧、移动燃烧）
+            process_items = []       # 表格23：制程排放因子表
+            fugitive_items = []      # 表格24：逸散排放表
 
-            # 按类别分组
+            for item in result['pro_ef_items']:
+                category = item.get('category', '')
+
+                # 根据类别判断子表类型
+                if '固定燃烧' in category or '移动燃烧' in category:
+                    # 燃烧排放因子表（表格22）
+                    mapped_item = item.copy()
+                    # 添加模板期望的字段映射
+                    mapped_item['emission_source_type_dir'] = item.get('category', '')
+                    mapped_item['emission_source_dir'] = item.get('emission_source', '')
+                    mapped_item['emission_facilities_dir'] = item.get('facility', '')
+                    mapped_item['ncv_dir'] = item.get('ncv', '')
+                    mapped_item['emission_unit_dir'] = item.get('unit', '')
+                    mapped_item['emission_oa_dir'] = item.get('ox_rate', '')
+                    mapped_item['CO2_emission_cv_factor'] = item.get('CO2_emission_cv_factor', '')
+                    mapped_item['CH4_emission_cv_factor'] = item.get('CH4_emission_cv_factor', '')
+                    mapped_item['N2O_emission_cv_factor'] = item.get('N2O_emission_cv_factor', '')
+                    # 排放因子字段已在数据中
+                    combustion_items.append(mapped_item)
+
+                elif '制程排放' in category:
+                    # 制程排放因子表（表格23）
+                    mapped_item = item.copy()
+                    # 添加模板期望的字段映射
+                    mapped_item['emission_source_type_dir'] = item.get('category', '')
+                    mapped_item['emission_source_dir'] = item.get('emission_source', '')
+                    mapped_item['emission_facilities_dir'] = item.get('facility', '')
+                    # 制程排放只有CO2排放因子
+                    mapped_item['CO2_emission_factor'] = item.get('CO2_emission_factor', '')
+                    process_items.append(mapped_item)
+
+                elif '逸散排放' in category:
+                    # 逸散排放表（表格24）
+                    mapped_item = item.copy()
+                    # 添加模板期望的字段映射
+                    mapped_item['emission_source_type_dir'] = item.get('category', '')
+                    mapped_item['emission_source_dir'] = item.get('emission_source', '')
+                    mapped_item['emission_facilities_dir'] = item.get('facility', '')
+                    # 逸散排放特有字段
+                    # 注意：需要从原始数据中获取 HFCs/PFCs, MCF, Bo 等字段
+                    # 这些字段在 _extract_fugitive_ef_row 中可能没有正确提取
+                    mapped_item['HFCs_PCFs_emission_factor'] = item.get('CO2_emission_factor', '')  # 使用CO2_emission_factor作为默认
+                    mapped_item['MCF'] = ''  # 需要补充
+                    mapped_item['Bo'] = ''    # 需要补充
+                    mapped_item['emission_factor'] = item.get('CO2_emission_factor', '')
+                    mapped_item['emission_unit_dir'] = item.get('unit', '')
+                    fugitive_items.append(mapped_item)
+
+            # 设置三个表格的数据
+            result['emission_factor_combustion_items'] = combustion_items
+            result['emission_factor_process_items'] = process_items
+            result['emission_factor_fugitive_items'] = fugitive_items
+
+            # 向后兼容：设置 emission_factor_items（包含所有数据）
+            result['emission_factor_items'] = combustion_items + process_items + fugitive_items
+
+            print("[后处理] 排放因子表数据分组:")
+            print(f"  emission_factor_combustion_items (表格22-燃烧): {len(combustion_items)} 条")
+            print(f"  emission_factor_process_items (表格23-制程): {len(process_items)} 条")
+            print(f"  emission_factor_fugitive_items (表格24-逸散): {len(fugitive_items)} 条")
+            print(f"  emission_factor_items (总计): {len(result['emission_factor_items'])} 条")
+
+            # 按类别分组（用于范围一排放数据）
             grouped_data = group_by_emission_category(result['pro_ef_items'])
             result.update(grouped_data)
-            print("[后处理] 排放因子按类别分组:")
-            for group_name, items in grouped_data.items():
-                print(f"  {group_name}: {len(items)} 条")
 
         # 2. 处理范围一排放数据的类别分组
         if 'scope1_emissions_items' in result and result['scope1_emissions_items']:
@@ -1642,6 +1729,378 @@ class ExcelDataReaderRefactored:
             if self.fingerprint.identify(sheet, sheet.title) == protocol_name:
                 return self.extractor.extract_from_sheet(sheet, protocol_name)
         return []
+
+    def _extract_emission_factor_subtables(self, sheet: openpyxl.worksheet.Worksheet) -> List[Dict[str, Any]]:
+        """
+        从排放因子表中提取所有子表的数据
+
+        附表2-EF 包含多个子表，每个子表以"编号"开始
+        每个子表对应不同的排放类别和不同的列结构
+
+        Returns:
+            包含所有子表数据的字典列表
+        """
+        print(f"[排放因子表] 开始识别子表...")
+
+        # 第一步：找到所有"编号"出现的行（子表开始位置）
+        subtable_starts = []
+        for row_idx in range(1, sheet.max_row + 1):
+            for cell in sheet[row_idx]:
+                if cell.value and str(cell.value).strip() == '编号':
+                    subtable_starts.append(row_idx)
+                    break
+
+        print(f"[排放因子表] 找到 {len(subtable_starts)} 个子表")
+
+        all_data = []
+
+        # 第二步：处理每个子表
+        for i, start_row in enumerate(subtable_starts):
+            end_row = subtable_starts[i + 1] if i + 1 < len(subtable_starts) else sheet.max_row + 1
+
+            # 读取子表的前几行来识别表头结构
+            subtable_data = self._extract_single_ef_subtable(sheet, start_row, end_row)
+
+            if subtable_data:
+                all_data.extend(subtable_data)
+                print(f"[排放因子表] 子表 {i + 1}: 提取到 {len(subtable_data)} 行数据")
+
+        print(f"[排放因子表] 总共提取到 {len(all_data)} 行数据")
+        return all_data
+
+    def _extract_single_ef_subtable(self, sheet: openpyxl.worksheet.Worksheet,
+                                   start_row: int, end_row: int) -> List[Dict[str, Any]]:
+        """
+        从单个排放因子子表中提取数据
+
+        Args:
+            sheet: 工作表对象
+            start_row: 子表开始行
+            end_row: 子表结束行
+
+        Returns:
+            该子表的数据列表
+        """
+        # 读取前5行来识别表头结构
+        header_rows = []
+        for row_idx in range(start_row, min(start_row + 5, end_row)):
+            row = sheet[row_idx]
+            row_data = []
+            for cell in row:
+                value = cell.value if cell.value is not None else ''
+                row_data.append(str(value).strip())
+            header_rows.append(row_data)
+
+        # 识别子表类型（通过分析表头结构）
+        subtable_type = self._identify_ef_subtable_type(header_rows)
+
+        # 根据子表类型提取数据
+        return self._extract_ef_subtable_data_by_type(sheet, start_row, end_row, subtable_type)
+
+    def _identify_ef_subtable_type(self, header_rows: List[List[str]]) -> str:
+        """
+        根据表头行识别子表类型
+
+        Returns:
+            子表类型: 'combustion', 'process', 'fugitive', 'scope2', 'scope3_general', 'scope3_capital',
+                     'scope3_fuel', 'scope3_transport', 'scope3_waste', 'scope3_business',
+                     'scope3_commuting', 'scope3_processing', 'combustion_extra', 'scope3_disposal'
+        """
+        # 合并所有表头行进行分析
+        all_text = ' '.join([' '.join(row) for row in header_rows])
+
+        # 按优先级检查特征
+        if '低位发热量' in all_text and '氧化率' in all_text:
+            return 'combustion'  # 燃烧排放因子表（固定/移动燃烧）
+        elif 'CO2排放因子' in all_text and '制程' not in all_text:
+            # 制程排放也有 CO2排放因子，但会在下一条件中优先匹配
+            return 'process'  # 制程排放因子表
+        elif 'HFCs/PFCs' in all_text or 'MCF' in all_text or 'Bo' in all_text:
+            return 'fugitive'  # 逸散排放表
+        elif '外购能源间接排放' in all_text:
+            return 'scope2'  # 外购能源表
+        elif '外购商品和服务' in all_text or '铁矿石' in all_text:
+            return 'scope3_general'  # 外购商品和服务表
+        elif '资本货物' in all_text:
+            return 'scope3_capital'  # 资本货物表
+        elif '燃料和能源相关' in all_text or '液化石油气生产' in all_text:
+            return 'scope3_fuel'  # 燃料和能源相关表
+        elif '上下游运输配送' in all_text or '船运' in all_text:
+            return 'scope3_transport'  # 运输配送表
+        elif '运营中产生的废物排放' in all_text or '生活垃圾' in all_text:
+            return 'scope3_waste'  # 废物排放表
+        elif '商务旅行' in all_text or '航运' in all_text and '员工通勤' not in all_text:
+            return 'scope3_business'  # 商务旅行表
+        elif '员工通勤' in all_text:
+            return 'scope3_commuting'  # 员工通勤表
+        elif '外销产品加工' in all_text:
+            return 'scope3_processing'  # 产品加工表
+        elif '外售产品报废' in all_text:
+            return 'scope3_disposal'  # 产品报废表
+        else:
+            return 'scope3_general'  # 默认作为范围三通用表
+
+    def _extract_ef_subtable_data_by_type(self, sheet: openpyxl.worksheet.Worksheet,
+                                         start_row: int, end_row: int,
+                                         subtable_type: str) -> List[Dict[str, Any]]:
+        """
+        根据子表类型提取数据
+
+        Args:
+            sheet: 工作表对象
+            start_row: 子表开始行
+            end_row: 子表结束行
+            subtable_type: 子表类型
+
+        Returns:
+            该子表的数据列表
+        """
+        data_items = []
+
+        # 动态确定数据开始行：跳过表头行，找到第一个有编号的数据行
+        # 通常前3-4行是表头，但有些子表只有2-3行表头
+        data_start_row = start_row + 2  # 从第3行开始检查
+
+        # 找到第一个包含数字编号的行作为数据开始行
+        for row_idx in range(start_row + 2, min(start_row + 6, end_row)):
+            row = sheet[row_idx]
+            # 检查Col2是否有数字编号
+            if len(row) > 1:
+                col2_value = row[1].value if row[1].value is not None else ''
+                try:
+                    # 尝试转换为数字
+                    float(col2_value)
+                    data_start_row = row_idx
+                    break
+                except (ValueError, TypeError):
+                    continue
+
+        for row_idx in range(data_start_row, end_row):
+            row = sheet[row_idx]
+
+            # 检查是否是空行
+            if not any(cell.value is not None for cell in row):
+                continue
+
+            # 根据子表类型提取数据
+            if subtable_type == 'combustion':
+                item = self._extract_combustion_ef_row(row)
+            elif subtable_type == 'process':
+                item = self._extract_process_ef_row(row)
+            elif subtable_type == 'fugitive':
+                item = self._extract_fugitive_ef_row(row)
+            elif subtable_type == 'scope2':
+                item = self._extract_scope2_ef_row(row)
+            elif subtable_type in ['scope3_general', 'scope3_capital', 'scope3_fuel',
+                                   'scope3_transport', 'scope3_waste', 'scope3_business',
+                                   'scope3_commuting', 'scope3_processing', 'scope3_disposal']:
+                item = self._extract_scope3_ef_row(row, subtable_type)
+            else:
+                continue
+
+            if item and item.get('category'):  # 确保有类别信息
+                data_items.append(item)
+
+        return data_items
+
+    def _extract_combustion_ef_row(self, row) -> Dict[str, Any]:
+        """提取燃烧排放因子行数据"""
+        try:
+            number = self._safe_get_cell(row, 1)  # Col2 (0-based index 1)
+            category = self._safe_get_cell(row, 2)  # Col3
+            emission_source = self._safe_get_cell(row, 3)  # Col4
+            facility = self._safe_get_cell(row, 4)  # Col5
+            ncv = self._safe_float(self._safe_get_cell(row, 5))  # Col6
+            unit = self._safe_get_cell(row, 6)  # Col7
+            ox_rate = self._safe_float(self._safe_get_cell(row, 7))  # Col8
+            co2_cv = self._safe_float(self._safe_get_cell(row, 8))  # Col9: 基于热值 CO2
+            ch4_cv = self._safe_float(self._safe_get_cell(row, 9))  # Col10: 基于热值 CH4
+            n2o_cv = self._safe_float(self._safe_get_cell(row, 10))  # Col11: 基于热值 N2O
+            co2_ef = self._safe_float(self._safe_get_cell(row, 11))  # Col12: 排放因子 CO2
+            ch4_ef = self._safe_float(self._safe_get_cell(row, 12))  # Col13: 排放因子 CH4
+            n2o_ef = self._safe_float(self._safe_get_cell(row, 13))  # Col14: 排放因子 N2O
+
+            return {
+                'number': number,
+                'category': category,
+                'emission_source': emission_source,
+                'facility': facility,
+                'ncv': ncv,
+                'unit': unit,
+                'ox_rate': ox_rate,
+                'CO2_emission_cv_factor': co2_cv,
+                'CH4_emission_cv_factor': ch4_cv,
+                'N2O_emission_cv_factor': n2o_cv,
+                'CO2_emission_factor': co2_ef,
+                'CH4_emission_factor': ch4_ef,
+                'N2O_emission_factor': n2o_ef,
+            }
+        except Exception as e:
+            return {}
+
+    def _extract_process_ef_row(self, row) -> Dict[str, Any]:
+        """提取制程排放因子行数据"""
+        try:
+            number = self._safe_get_cell(row, 1)  # Col2
+            category = self._safe_get_cell(row, 2)  # Col3
+            emission_source = self._safe_get_cell(row, 3)  # Col4
+            facility = self._safe_get_cell(row, 4)  # Col5
+            co2_ef = self._safe_float(self._safe_get_cell(row, 5))  # Col6: CO2排放因子
+            unit = self._safe_get_cell(row, 6)  # Col7
+
+            return {
+                'number': number,
+                'category': category,
+                'emission_source': emission_source,
+                'facility': facility,
+                'ncv': 0,
+                'unit': unit,
+                'ox_rate': 0,
+                'CO2_emission_cv_factor': 0,
+                'CH4_emission_cv_factor': 0,
+                'N2O_emission_cv_factor': 0,
+                'CO2_emission_factor': co2_ef,
+                'CH4_emission_factor': 0,
+                'N2O_emission_factor': 0,
+            }
+        except Exception as e:
+            return {}
+
+    def _extract_fugitive_ef_row(self, row) -> Dict[str, Any]:
+        """提取逸散排放因子行数据"""
+        try:
+            number = self._safe_get_cell(row, 1)  # Col2
+            category = self._safe_get_cell(row, 2)  # Col3
+            emission_source = self._safe_get_cell(row, 3)  # Col4
+            facility = self._safe_get_cell(row, 4)  # Col5
+
+            # 逸散排放表的特殊字段结构
+            # Col6: HFCs/PFCs (EF估计值)
+            # Col7: 单位
+            # Col8: MCF
+            # Col9: Bo
+            # Col10: 排放因子
+            # Col11: 单位
+            # Col12: 排放因子引用源
+
+            hfcs_pfcs = self._safe_float(self._safe_get_cell(row, 5))  # Col6
+            unit1 = self._safe_get_cell(row, 6)  # Col7
+            mcf = self._safe_float(self._safe_get_cell(row, 7))  # Col8
+            bo = self._safe_float(self._safe_get_cell(row, 8))  # Col9
+            ef_value = self._safe_float(self._safe_get_cell(row, 9))  # Col10
+            unit2 = self._safe_get_cell(row, 10)  # Col11
+            source = self._safe_get_cell(row, 11)  # Col12
+
+            # 如果CH4逸散，需要使用MCF和Bo计算
+            if 'CH4逸散' in category and ef_value == 0:
+                if mcf > 0 and bo > 0:
+                    ef_value = mcf * bo
+
+            return {
+                'number': number,
+                'category': category,
+                'emission_source': emission_source,
+                'facility': facility,
+                'ncv': 0,
+                'unit': unit2 or unit1,
+                'ox_rate': 0,
+                'CO2_emission_cv_factor': 0,
+                'CH4_emission_cv_factor': 0,
+                'N2O_emission_cv_factor': 0,
+                'CO2_emission_factor': ef_value,
+                'CH4_emission_factor': 0,
+                'N2O_emission_factor': 0,
+                # 逸散排放特有字段
+                'HFCs_PCFs_emission_factor': hfcs_pfcs,
+                'MCF': mcf,
+                'Bo': bo,
+                'emission_factor': ef_value,
+                'emission_source_dir': '',
+                'emission_unit_dir': unit2 or unit1,
+            }
+        except Exception as e:
+            return {}
+
+    def _extract_scope2_ef_row(self, row) -> Dict[str, Any]:
+        """提取外购能源排放因子行数据"""
+        try:
+            number = self._safe_get_cell(row, 1)  # Col2
+            category = self._safe_get_cell(row, 2)  # Col3
+            emission_source = self._safe_get_cell(row, 3)  # Col4
+            facility = self._safe_get_cell(row, 4)  # Col5
+            ef_value = self._safe_float(self._safe_get_cell(row, 5))  # Col6
+            unit = self._safe_get_cell(row, 6)  # Col7
+
+            return {
+                'number': number,
+                'category': category,
+                'emission_source': emission_source,
+                'facility': facility,
+                'ncv': 0,
+                'unit': unit,
+                'ox_rate': 0,
+                'CO2_emission_cv_factor': 0,
+                'CH4_emission_cv_factor': 0,
+                'N2O_emission_cv_factor': 0,
+                'CO2_emission_factor': ef_value,
+                'CH4_emission_factor': 0,
+                'N2O_emission_factor': 0,
+            }
+        except Exception as e:
+            return {}
+
+    def _extract_scope3_ef_row(self, row, subtable_type: str) -> Dict[str, Any]:
+        """提取范围三排放因子行数据"""
+        try:
+            number = self._safe_get_cell(row, 1)  # Col2
+            category = self._safe_get_cell(row, 2)  # Col3
+            emission_source = self._safe_get_cell(row, 3)  # Col4
+            facility = self._safe_get_cell(row, 4)  # Col5: Activity name
+            # Col6可能是Geography或CO2排放因子
+            col6_value = self._safe_get_cell(row, 5)
+            # 尝试解析为数字
+            try:
+                ef_value = float(col6_value)
+            except:
+                ef_value = 0
+            unit = self._safe_get_cell(row, 6)  # Col7或Col8
+
+            return {
+                'number': number,
+                'category': category,
+                'emission_source': emission_source,
+                'facility': facility,
+                'ncv': 0,
+                'unit': unit,
+                'ox_rate': 0,
+                'CO2_emission_cv_factor': 0,
+                'CH4_emission_cv_factor': 0,
+                'N2O_emission_cv_factor': 0,
+                'CO2_emission_factor': ef_value,
+                'CH4_emission_factor': 0,
+                'N2O_emission_factor': 0,
+            }
+        except Exception as e:
+            return {}
+
+    def _safe_get_cell(self, row, col_idx):
+        """安全获取单元格值"""
+        try:
+            if col_idx < len(row):
+                cell = row[col_idx]
+                return cell.value if cell.value is not None else ''
+            return ''
+        except:
+            return ''
+
+    def _safe_float(self, value) -> float:
+        """安全转换为浮点数"""
+        try:
+            if value is None or value == '':
+                return 0.0
+            return float(value)
+        except (ValueError, TypeError):
+            return 0.0
 
     def close(self):
         """关闭工作簿"""
