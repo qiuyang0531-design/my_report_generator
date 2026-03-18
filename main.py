@@ -87,6 +87,31 @@ def prepare_context_with_formatting(context):
             # print(f"[初始化协议变量] {var_name} = {default_value}")
     # ========== 协议变量初始化结束 ==========
 
+    # ========== 特殊处理：模板中表格33用于类别8和类别12 ==========
+    # 由于模板表格33使用cat8_ef_items，但类别8为空，类别12有数据
+    # 我们需要创建一个cat8_ef_items别名，指向cat12_ef_items的数据
+    # 这样模板的空类别检测逻辑会认为表格33有数据，不会删除
+    cat8_items = context.get('cat8_ef_items', [])
+    cat12_items = context.get('cat12_ef_items', [])
+
+    # 如果类别8为空且类别12有数据，则将类别12的数据复制一份用于表格33
+    # 注意：这里创建一个新的列表，不影响原始的cat12_ef_items
+    if (not cat8_items or len(cat8_items) == 0) and cat12_items and len(cat12_items) > 0:
+        # 创建cat8_ef_items，填充类别12的数据
+        cat8_mapped_items = []
+        for item in cat12_items:
+            # 将cat12的字段映射到cat8字段
+            mapped_item = {}
+            for key, value in item.items():
+                if 'cat12' in key:
+                    new_key = key.replace('cat12', 'cat8')
+                    mapped_item[new_key] = value
+                else:
+                    mapped_item[key] = value
+            cat8_mapped_items.append(mapped_item)
+        formatted_context['cat8_ef_items'] = cat8_mapped_items
+        print("  [特殊处理] 类别8为空，将类别12数据映射到表格33")
+
     # ========== 新增：全局字符串清洗步骤 ==========
     # 遍历所有值，对字符串类型执行 strip() 去除冗余空格
     def clean_strings_in_dict(d):
@@ -573,7 +598,7 @@ def prepare_context_with_formatting(context):
 
 def generate_report_from_xlsx(
     xlsx_path="test_data.xlsx",
-    template_path="template_new.docx",
+    template_path="template.docx",
     output_path="carbon_report.docx"
 ):
     """
@@ -963,14 +988,19 @@ def clean_empty_category_tables(doc, context):
     }
 
     # 检查哪些类别没有数据
+    # 判定条件：既没有排放因子数据，也没有详细数据，也没有排放量
     empty_categories = []
     for i in range(1, TOTAL_SCOPE3_CATEGORIES + 1):
+        ef_items = context.get(f'cat{i}_ef_items', [])
         detail_items = context.get(f'scope3_category{i}', [])
         emission_value = context.get(f'scope_3_category_{i}_emissions', 0)
+
+        has_ef_items = ef_items and len(ef_items) > 0
         has_detail_items = detail_items and len(detail_items) > 0
         has_emissions = emission_value and emission_value > 0
 
-        if not (has_detail_items or has_emissions):
+        # 如果没有任何数据，则标记为空类别
+        if not (has_ef_items or has_detail_items or has_emissions):
             empty_categories.append(i)
 
     if not empty_categories:
@@ -981,79 +1011,148 @@ def clean_empty_category_tables(doc, context):
 
     deleted_count = 0
 
-    for cat_num in empty_categories:
-        category_name = category_names.get(cat_num, "")
+    # 新的删除策略：先收集所有要删除的段落对象，再统一删除
+    # 这样避免了删除过程中索引变化的问题
+    all_paragraphs_to_remove = []
 
-        # 步骤1：查找并删除所有相关的标题段落
-        paragraphs_to_remove = []
-        unit_paragraphs_to_remove = []
+    # 步骤1：查找并删除所有相关的标题段落和单位段落
+    for para in doc.paragraphs:
+        text = para.text.strip()
+        if not text:
+            continue
 
-        for i, para in enumerate(doc.paragraphs):
-            text = para.text.strip()
+        # 检查是否是空类别相关的段落
+        is_empty_category_para = False
+        matched_cat_num = None
 
-            # 多种匹配模式
+        for cat_num in empty_categories:
+            category_name = category_names.get(cat_num, "")
             is_target_category = (
                 f'范围三 类别{cat_num}' in text or
                 f'范围三类别{cat_num}' in text or
                 f'类别{cat_num}' in text or
-                category_name in text
+                (category_name and category_name in text)
             )
 
             if is_target_category:
-                paragraphs_to_remove.append(i)
+                is_empty_category_para = True
+                matched_cat_num = cat_num
+                break
 
-        # 步骤2：查找与空类别关联的"单位：吨CO2e"段落
-        # 检查每个标题段落的前后
-        for title_idx in paragraphs_to_remove:
-            # 检查前一个段落
-            if title_idx > 0:
-                prev_para = doc.paragraphs[title_idx - 1]
-                if '单位：吨CO2e' in prev_para.text or '单位: 吨CO2e' in prev_para.text:
-                    if title_idx - 1 not in unit_paragraphs_to_remove:
-                        unit_paragraphs_to_remove.append(title_idx - 1)
+        if is_empty_category_para:
+            all_paragraphs_to_remove.append(para)
 
-            # 检查后一个段落
-            if title_idx + 1 < len(doc.paragraphs):
-                next_para = doc.paragraphs[title_idx + 1]
-                if '单位：吨CO2e' in next_para.text or '单位: 吨CO2e' in next_para.text:
-                    if title_idx + 1 not in unit_paragraphs_to_remove:
-                        unit_paragraphs_to_remove.append(title_idx + 1)
+    # 步骤2：查找与空类别关联的"单位：吨CO2e"段落
+    # 通过检查段落的前后来判断
+    all_paragraphs_list = list(doc.paragraphs)
+    for i, para in enumerate(all_paragraphs_list):
+        text = para.text.strip()
+        if ('单位：吨CO2e' in text or '单位: 吨CO2e' in text) and para not in all_paragraphs_to_remove:
+            # 检查这个单位段落的前后是否有空类别的标题
+            check_range = 2  # 检查前后2个段落
+            for j in range(max(0, i - check_range), min(len(all_paragraphs_list), i + check_range + 1)):
+                if j == i:
+                    continue
+                nearby_text = all_paragraphs_list[j].text.strip()
+                for cat_num in empty_categories:
+                    if f'类别{cat_num}' in nearby_text:
+                        all_paragraphs_to_remove.append(para)
+                        break
+                if para in all_paragraphs_to_remove:
+                    break
 
-        # 合并所有要删除的段落
-        all_to_remove = sorted(set(paragraphs_to_remove + unit_paragraphs_to_remove), reverse=True)
-
-        # 步骤3：删除所有标记的段落
-        for idx in all_to_remove:
-            if idx < len(doc.paragraphs):
-                para = doc.paragraphs[idx]
-                para_element = para._element
-                parent = para_element.getparent()
+    # 步骤3：删除所有标记的段落
+    # 使用段落对象直接删除，避免索引问题
+    deleted_count = 0
+    for para in all_paragraphs_to_remove:
+        try:
+            para_element = para._element
+            parent = para_element.getparent()
+            if parent is not None:
                 parent.remove(para_element)
                 deleted_count += 1
+        except Exception as e:
+            print(f"  删除段落时出错: {e}")
 
-        # 在删除位置插入空段落保持结构
-        if paragraphs_to_remove:
-            parent = doc.paragraphs[paragraphs_to_remove[0]]._element.getparent()
-            new_para = OxmlElement('w:p')
-            parent.insert(0, new_para)
+    print(f"  已删除 {deleted_count} 个空类别相关段落")
 
     # 步骤4：删除空类别相关的表格
+    # 表格26-40对应范围三类别1-15，需要根据空类别列表删除相应表格
     tables_to_remove = []
-    for table_idx, table in enumerate(doc.tables):
-        table_text = ""
-        for row in table.rows[:3]:
-            for cell in row.cells:
-                table_text += cell.text + " "
 
-        # 检查表格是否包含空类别
-        for cat_num in empty_categories:
-            category_name = category_names.get(cat_num, "")
-            if (category_name in table_text or
-                f'类别{cat_num}' in table_text):
-                if len(table.rows) <= 3:  # 空表格
+    # 范围三类别表格索引映射（模板中的固定位置）
+    # 注意：类别11使用燃烧表格式，在表格32位置
+    scope3_table_mapping = {
+        1: 26,   # 表格26: 类别1
+        2: 27,   # 表格27: 类别2
+        3: 28,   # 表格28: 类别3
+        4: 29,   # 表格29: 类别4
+        5: 30,   # 表格30: 类别5
+        6: 31,   # 表格31: 类别6
+        7: 37,   # 表格37: 类别7（注意：表格32是类别11燃烧表）
+        8: 33,   # 表格33: 类别8（或类别12）
+        9: 34,   # 表格34: 类别9
+        10: 35,  # 表格35: 类别10
+        11: 32,  # 表格32: 类别11（燃烧表格式）
+        12: 33,  # 表格33: 类别12（可能与类别8共用）
+        13: 36,  # 表格36: 类别13
+        14: 37,  # 表格37: 类别14
+        15: 38,  # 表格38: 类别15
+    }
+
+    # 找出需要删除的表格索引
+    for cat_num in empty_categories:
+        if cat_num in scope3_table_mapping:
+            table_idx = scope3_table_mapping[cat_num]
+            if table_idx < len(doc.tables):
+                table = doc.tables[table_idx]
+                # 检查表格是否只有表头（2-3行）
+                if len(table.rows) <= 3:
                     tables_to_remove.append(table_idx)
                     print(f"  标记删除类别{cat_num}的表格: 索引{table_idx}")
-                    break
+
+    # 同时检查所有范围三类别表格（表格26-40），删除只有表头的表格
+    for table_idx in range(26, min(41, len(doc.tables))):
+        if table_idx in tables_to_remove:
+            continue  # 已经标记删除
+
+        table = doc.tables[table_idx]
+        if len(table.rows) <= 3:
+            # 检查表格是否真的没有数据（所有数据单元格都是空的或包含默认值）
+            has_data = False
+            # 先检查表格行数
+            if len(table.rows) > 3:
+                # 超过3行，通常有数据
+                has_data = True
+            else:
+                # 3行或以下，检查是否有实际数据
+                for row_idx in range(1, len(table.rows)):  # 跳过第1个表头行
+                    row = table.rows[row_idx]
+                    for cell in row.cells:
+                        text = cell.text.strip()
+                        # 如果单元格有内容且不是表头关键词，认为是数据行
+                        # 排除常见的表头和单位词汇
+                        header_keywords = ['编号', 'GHG排放类别', '排放源', 'Activity name', 'Geography',
+                                        'CO2', '单位', '引用源', '缺省排放因子', '排放因子', '基于热值',
+                                        'IPCC-2006', '计算值', '企业温室气体', '数据品质等级']
+                        if text and text not in header_keywords:
+                            # 进一步检查：如果是数字且不是0，或者是较长的文本，认为是数据
+                            try:
+                                val = float(text)
+                                if val > 0:
+                                    has_data = True
+                                    break
+                            except (ValueError, TypeError):
+                                # 不是数字，检查文本长度
+                                if len(text) > 5:  # 超过5个字符，认为是数据
+                                    has_data = True
+                                    break
+                    if has_data:
+                        break
+
+            if not has_data:
+                tables_to_remove.append(table_idx)
+                print(f"  标记删除空表格: 索引{table_idx}（只有表头）")
 
     # 从后往前删除表格
     for table_idx in sorted(tables_to_remove, reverse=True):

@@ -777,6 +777,113 @@ class ExcelDataReaderRefactored:
             print(f"  emission_factor_fugitive_items (表格24-逸散): {len(fugitive_items)} 条")
             print(f"  emission_factor_items (总计): {len(result['emission_factor_items'])} 条")
 
+            # ========== 处理外购能源间接排放因子（范围二排放因子）==========
+            # 从附表2-EF中提取外购能源间接排放因子数据
+            scope2_ef_raw_items = [item for item in result.get('pro_ef_items', [])
+                                   if '范围二' in item.get('category', '') and '外购能源' in item.get('category', '')]
+
+            # ========== 处理外购能源间接排放因子（范围二排放因子）==========
+            # 创建模板期望的indir_ef_items格式
+            indir_ef_items = []
+            for item in scope2_ef_raw_items:
+                mapped_item = {
+                    'number': item.get('number', ''),
+                    'emission_source_type_indir': item.get('category', ''),
+                    'emission_source_indir': item.get('emission_source', ''),
+                    'emission_facilities_indir': item.get('facility', ''),
+                    'elec_emission_factor': item.get('CO2_emission_factor', ''),
+                    'elec_emission_unit': item.get('unit', ''),
+                    'elec_emission_source': item.get('emission_source_reference', ''),
+                }
+                indir_ef_items.append(mapped_item)
+
+            result['indir_ef_items'] = indir_ef_items
+            print(f"  indir_ef_items (外购能源间接排放因子): {len(indir_ef_items)} 条")
+
+            # ========== 处理范围三所有类别排放因子（cat1-cat15）==========
+            # 支持新格式："范围三 类别N XXX"（N为1-15）
+            # 兼容旧格式：直接使用类别名称
+
+            # 首先按类别分组，提取类别编号
+            category_groups = {}  # {cat_num: [items]}
+            for item in result.get('pro_ef_items', []):
+                category = item.get('category', '')
+                cat_num = None
+
+                # 尝试从类别名称中提取编号 (新格式)
+                # 匹配 "范围三 类别N" 或 "范围3 类别N" (N为1-15)
+                # 使用更精确的匹配，避免"类别1"匹配到"类别11"
+                for cat_id in range(15, 0, -1):  # 从大到小匹配，避免部分匹配
+                    if f'范围三 类别{cat_id}' in category or f'范围三类别{cat_id}' in category or f'范围3 类别{cat_id}' in category:
+                        cat_num = cat_id
+                        break
+
+                if not cat_num:
+                    # 使用旧格式的映射 (向后兼容)
+                    legacy_mapping = {
+                        '外购商品和服务的上游排放': 1,
+                        '资本货物': 2,
+                        '范围一、二之外燃料和能源相关的活动产生的排放': 3,
+                        '上下游运输配送产生的排放': 4,
+                        '运营中产生的废物排放': 5,
+                        '商务旅行产生的排放': 6,
+                        '员工通勤': 7,
+                        '上游租赁资产': 8,
+                        '下游运输配送': 9,
+                        '外销产品加工': 10,
+                        '外销产品使用': 11,
+                        '外售产品报废': 12,
+                    }
+                    cat_num = legacy_mapping.get(category)
+
+                if cat_num and 1 <= cat_num <= 15:
+                    if cat_num not in category_groups:
+                        category_groups[cat_num] = []
+                    category_groups[cat_num].append(item)
+
+            # 为所有类别1-15创建对应的变量（即使为空）
+            for cat_num in range(1, 16):
+                cat_prefix = f'cat{cat_num}'
+                items = category_groups.get(cat_num, [])
+
+                cat_ef_items = []
+                for item in items:
+                    # 基础字段映射
+                    mapped_item = {
+                        'number': item.get('number', ''),
+                        f'emission_source_type_{cat_prefix}': item.get('category', ''),
+                        f'emission_source_{cat_prefix}': item.get('emission_source', ''),
+                        f'emission_name_{cat_prefix}': item.get('activity_name', ''),
+                        f'emission_geo_{cat_prefix}': item.get('geography', ''),
+                        f'{cat_prefix}_emission_factor': item.get('CO2_emission_factor', ''),
+                        f'{cat_prefix}_emission_unit': item.get('unit', ''),
+                        f'{cat_prefix}_emission_source': item.get('emission_source_reference', ''),
+                    }
+
+                    # 检查是否是燃烧表格式（包含ncv字段）
+                    # 如果是，添加燃烧表特有字段
+                    if item.get('ncv') is not None and item.get('ncv') != 0:
+                        mapped_item[f'ncv_{cat_prefix}'] = item.get('ncv', '')
+                        mapped_item[f'emission_unit_{cat_prefix}'] = item.get('unit', '')
+                        mapped_item[f'emission_oa_{cat_prefix}'] = item.get('ox_rate', '')
+                        # 基于热值的排放因子字段
+                        mapped_item[f'CO2_emission_cv_factor'] = item.get('CO2_emission_cv_factor', '')
+                        mapped_item[f'CH4_emission_cv_factor'] = item.get('CH4_emission_cv_factor', '')
+                        mapped_item[f'N2O_emission_cv_factor'] = item.get('N2O_emission_cv_factor', '')
+                        # 基于体积的排放因子字段 - 修复：添加CO2排放因子映射
+                        mapped_item[f'CO2_emission_factor'] = item.get('CO2_emission_factor', '')
+                        mapped_item[f'CH4_emission_factor'] = item.get('CH4_emission_factor', '')
+                        mapped_item[f'N2O_emission_factor'] = item.get('N2O_emission_factor', '')
+
+                    cat_ef_items.append(mapped_item)
+
+                result[f'{cat_prefix}_ef_items'] = cat_ef_items
+                if items:
+                    category_name = items[0].get('category', '')[:40]
+                    print(f"  {cat_prefix}_ef_items (类别{cat_num}): {len(cat_ef_items)} 条")
+                else:
+                    print(f"  {cat_prefix}_ef_items (类别{cat_num}): 0 条 - 无数据")
+
             # 按类别分组（用于范围一排放数据）
             grouped_data = group_by_emission_category(result['pro_ef_items'])
             result.update(grouped_data)
@@ -1791,7 +1898,29 @@ class ExcelDataReaderRefactored:
                 row_data.append(str(value).strip())
             header_rows.append(row_data)
 
-        # 识别子表类型（通过分析表头结构）
+        # 查找第一行数据以获取类别信息
+        first_data_row = None
+        for row_idx in range(start_row + 2, min(start_row + 10, end_row)):
+            row = sheet[row_idx]
+            # 检查Col2是否有数字编号
+            if len(row) > 1:
+                col2_value = row[1].value if row[1].value is not None else ''
+                try:
+                    float(col2_value)  # 如果是数字，说明这是数据行
+                    first_data_row = row
+                    break
+                except (ValueError, TypeError):
+                    continue
+
+        # 如果找到数据行，将其信息也添加到header_rows用于识别
+        if first_data_row:
+            data_row_data = []
+            for cell in first_data_row[:8]:
+                value = cell.value if cell.value is not None else ''
+                data_row_data.append(str(value).strip())
+            header_rows.append(data_row_data)
+
+        # 识别子表类型（通过分析表头结构和数据行）
         subtable_type = self._identify_ef_subtable_type(header_rows)
 
         # 根据子表类型提取数据
@@ -1801,44 +1930,71 @@ class ExcelDataReaderRefactored:
         """
         根据表头行识别子表类型
 
+        支持显式类别标识：
+        - "范围一 XXX" -> scope1_combustion/scope1_process/scope1_fugitive
+        - "范围二 XXX" -> scope2
+        - "范围三 类别N XXX" -> scope3_catN (N为1-15)
+
         Returns:
-            子表类型: 'combustion', 'process', 'fugitive', 'scope2', 'scope3_general', 'scope3_capital',
-                     'scope3_fuel', 'scope3_transport', 'scope3_waste', 'scope3_business',
-                     'scope3_commuting', 'scope3_processing', 'combustion_extra', 'scope3_disposal'
+            子表类型
         """
         # 合并所有表头行进行分析
         all_text = ' '.join([' '.join(row) for row in header_rows])
 
-        # 按优先级检查特征
+        # ========== 优先级1：识别范围三 "范围三 类别N" (简单字符串匹配) ==========
+        # 支持格式：范围三 类别N, 范围三类别N, 范围3 类别N
+        # 改为从大到小匹配，避免"类别1"匹配到"类别12"
+        for cat_num in range(15, 0, -1):
+            if f'范围三 类别{cat_num}' in all_text or f'范围三类别{cat_num}' in all_text or f'范围3 类别{cat_num}' in all_text:
+                return f'scope3_cat{cat_num}'
+
+        # ========== 优先级2：识别范围二 "范围二" ==========
+        if '范围二' in all_text or '范围2' in all_text:
+            return 'scope2'
+
+        # ========== 优先级3：识别范围一排放因子类型 ==========
+        if '范围一' in all_text or '范围1' in all_text:
+            # 进一步细分范围一的类型
+            if '低位发热量' in all_text and '氧化率' in all_text:
+                return 'combustion'
+            elif '制程排放' in all_text or '工艺排放' in all_text:
+                return 'process'
+            elif '逸散排放' in all_text or 'HFCs/PFCs' in all_text:
+                return 'fugitive'
+            return 'scope1_combustion'  # 默认为燃烧
+
+        # ========== 优先级4：旧格式关键词匹配（向后兼容）==========
         if '低位发热量' in all_text and '氧化率' in all_text:
-            return 'combustion'  # 燃烧排放因子表（固定/移动燃烧）
-        elif 'CO2排放因子' in all_text and '制程' not in all_text:
-            # 制程排放也有 CO2排放因子，但会在下一条件中优先匹配
-            return 'process'  # 制程排放因子表
+            return 'combustion'
+        elif 'CO2排放因子' in all_text and '制程排放' in all_text:
+            return 'process'
         elif 'HFCs/PFCs' in all_text or 'MCF' in all_text or 'Bo' in all_text:
-            return 'fugitive'  # 逸散排放表
+            return 'fugitive'
         elif '外购能源间接排放' in all_text:
-            return 'scope2'  # 外购能源表
-        elif '外购商品和服务' in all_text or '铁矿石' in all_text:
-            return 'scope3_general'  # 外购商品和服务表
-        elif '资本货物' in all_text:
-            return 'scope3_capital'  # 资本货物表
-        elif '燃料和能源相关' in all_text or '液化石油气生产' in all_text:
-            return 'scope3_fuel'  # 燃料和能源相关表
-        elif '上下游运输配送' in all_text or '船运' in all_text:
-            return 'scope3_transport'  # 运输配送表
-        elif '运营中产生的废物排放' in all_text or '生活垃圾' in all_text:
-            return 'scope3_waste'  # 废物排放表
-        elif '商务旅行' in all_text or '航运' in all_text and '员工通勤' not in all_text:
-            return 'scope3_business'  # 商务旅行表
-        elif '员工通勤' in all_text:
-            return 'scope3_commuting'  # 员工通勤表
-        elif '外销产品加工' in all_text:
-            return 'scope3_processing'  # 产品加工表
-        elif '外售产品报废' in all_text:
-            return 'scope3_disposal'  # 产品报废表
-        else:
-            return 'scope3_general'  # 默认作为范围三通用表
+            return 'scope2'
+
+        # ========== 优先级5：范围三类别关键词匹配（旧格式） ==========
+        scope3_keywords = {
+            '外购商品和服务': 'scope3_cat1',
+            '铁矿石': 'scope3_cat1',
+            '资本货物': 'scope3_cat2',
+            '燃料和能源相关': 'scope3_cat3',
+            '上下游运输配送': 'scope3_cat4',
+            '运营中产生的废物': 'scope3_cat5',
+            '商务旅行': 'scope3_cat6',
+            '员工通勤': 'scope3_cat7',
+            '上游租赁资产': 'scope3_cat8',
+            '下游运输配送': 'scope3_cat9',
+            '外销产品加工': 'scope3_cat10',
+            '外销产品使用': 'scope3_cat11',
+            '外售产品报废': 'scope3_cat12',
+        }
+
+        for keyword, subtable_type in scope3_keywords.items():
+            if keyword in all_text:
+                return subtable_type
+
+        return 'unknown'
 
     def _extract_ef_subtable_data_by_type(self, sheet: openpyxl.worksheet.Worksheet,
                                          start_row: int, end_row: int,
@@ -1857,12 +2013,23 @@ class ExcelDataReaderRefactored:
         """
         data_items = []
 
+        # 检查子表是否有燃烧表格式（用于判断某些范围三类别使用燃烧表结构）
+        has_combustion_format = False
+        for row_idx in range(start_row, min(start_row + 5, end_row)):
+            row = sheet[row_idx]
+            for cell in row:
+                if cell.value and isinstance(cell.value, str) and '低位发热量' in cell.value:
+                    has_combustion_format = True
+                    break
+            if has_combustion_format:
+                break
+
         # 动态确定数据开始行：跳过表头行，找到第一个有编号的数据行
-        # 通常前3-4行是表头，但有些子表只有2-3行表头
-        data_start_row = start_row + 2  # 从第3行开始检查
+        # 通常表头只有1-2行，从第2行开始检查
+        data_start_row = start_row + 1  # 从第2行开始检查
 
         # 找到第一个包含数字编号的行作为数据开始行
-        for row_idx in range(start_row + 2, min(start_row + 6, end_row)):
+        for row_idx in range(start_row + 1, min(start_row + 6, end_row)):
             row = sheet[row_idx]
             # 检查Col2是否有数字编号
             if len(row) > 1:
@@ -1891,6 +2058,15 @@ class ExcelDataReaderRefactored:
                 item = self._extract_fugitive_ef_row(row)
             elif subtable_type == 'scope2':
                 item = self._extract_scope2_ef_row(row)
+            elif subtable_type.startswith('scope3_cat'):
+                # 处理"范围三 类别N"格式
+                # 特殊处理：某些类别（如类别11）使用燃烧表格式
+                if has_combustion_format:
+                    # 使用燃烧表提取方式
+                    item = self._extract_combustion_ef_row(row)
+                else:
+                    # 使用标准范围三提取方式
+                    item = self._extract_scope3_ef_row(row, subtable_type)
             elif subtable_type in ['scope3_general', 'scope3_capital', 'scope3_fuel',
                                    'scope3_transport', 'scope3_waste', 'scope3_business',
                                    'scope3_commuting', 'scope3_processing', 'scope3_disposal']:
@@ -2030,6 +2206,7 @@ class ExcelDataReaderRefactored:
             facility = self._safe_get_cell(row, 4)  # Col5
             ef_value = self._safe_float(self._safe_get_cell(row, 5))  # Col6
             unit = self._safe_get_cell(row, 6)  # Col7
+            emission_source_reference = self._safe_get_cell(row, 7)  # Col8
 
             return {
                 'number': number,
@@ -2045,31 +2222,92 @@ class ExcelDataReaderRefactored:
                 'CO2_emission_factor': ef_value,
                 'CH4_emission_factor': 0,
                 'N2O_emission_factor': 0,
+                'emission_source_reference': emission_source_reference,
             }
         except Exception as e:
             return {}
 
     def _extract_scope3_ef_row(self, row, subtable_type: str) -> Dict[str, Any]:
-        """提取范围三排放因子行数据"""
+        """
+        提取范围三排放因子行数据
+
+        支持的子表类型：
+        - 'scope3_catN': N为类别编号（1-15）
+        - 'scope3_general', 'scope3_capital', 等旧格式（向后兼容）
+        """
         try:
+            import re
+
             number = self._safe_get_cell(row, 1)  # Col2
-            category = self._safe_get_cell(row, 2)  # Col3
+            raw_category = self._safe_get_cell(row, 2)  # Col3 (原始类别，可能是排放源名称)
             emission_source = self._safe_get_cell(row, 3)  # Col4
-            facility = self._safe_get_cell(row, 4)  # Col5: Activity name
-            # Col6可能是Geography或CO2排放因子
-            col6_value = self._safe_get_cell(row, 5)
-            # 尝试解析为数字
-            try:
-                ef_value = float(col6_value)
-            except:
-                ef_value = 0
-            unit = self._safe_get_cell(row, 6)  # Col7或Col8
+            activity_name = self._safe_get_cell(row, 4)  # Col5: Activity name
+
+            # 根据subtable_type确定正确的类别名称
+            # 如果subtable_type是'scope3_catN'格式，提取类别编号并生成标准类别名称
+            category = raw_category  # 默认使用原始类别
+            if subtable_type.startswith('scope3_cat'):
+                # 提取类别编号，例如 'scope3_cat9' -> 9
+                match = re.search(r'scope3_cat(\d+)', subtable_type)
+                if match:
+                    cat_num = match.group(1)
+                    category = f'范围三 类别{cat_num}'  # 设置标准类别名称
+                    # 如果原始类别不为空且与编号不同，可能包含有用的描述信息
+                    # 此时将原始类别作为排放源的补充信息
+                    # 注意：raw_category可能是数字（float），需要先转换为字符串
+                    raw_category_str = str(raw_category) if raw_category is not None else ''
+                    if raw_category_str and raw_category_str.strip() and raw_category_str != category:
+                        # 如果原始类别看起来像排放源名称（不是编号格式），则补充到emission_source
+                        if not raw_category_str.replace('.', '').isdigit():
+                            if not emission_source or not emission_source.strip():
+                                emission_source = raw_category_str
+
+            # 确定列结构：检查第5列（Col6）的值类型来判断
+            # 如果Col5是Geography（文本且非空、不是数字或公式），使用标准格式
+            # 如果Col5是空的或者是数字，使用资本货物格式
+            col5_value = self._safe_get_cell(row, 5)
+
+            # 判断是否有Geography列
+            # 如果Col5非空且不能转换为数字（且不是公式），认为是Geography列
+            # 注意：col5_value可能是数字，需要先转换为字符串再检查strip()
+            col5_str = str(col5_value) if col5_value is not None and col5_value != '' else ''
+            if col5_str and col5_str.strip():
+                # 排除公式（以=开头）
+                if col5_str.startswith('='):
+                    has_geography = False  # 是公式，没有Geography列
+                else:
+                    try:
+                        float(col5_value)
+                        has_geography = False  # 是数字，没有Geography列
+                    except (ValueError, TypeError):
+                        has_geography = True   # 是文本，有Geography列
+            else:
+                has_geography = False  # Col5为空，没有Geography列
+
+            if not has_geography:
+                # 资本货物列结构: 编号, 类别, 排放源, Activity name, CO2, 单位, 引用源
+                ef_value = self._safe_float(self._safe_get_cell(row, 5))  # Col6: CO2
+                unit = self._safe_get_cell(row, 6)  # Col7: 单位
+                emission_source_reference = self._safe_get_cell(row, 7)  # Col8: 引用源
+                geography = ''
+            else:
+                # 其他类别列结构: 编号, 类别, 排放源, Activity name, Geography, CO2, 单位, 引用源
+                geography = self._safe_get_cell(row, 5)  # Col6: Geography
+                col7_value = self._safe_get_cell(row, 6)  # Col7: CO2
+                try:
+                    ef_value = float(col7_value)
+                except:
+                    ef_value = 0
+                unit = self._safe_get_cell(row, 7)  # Col8: 单位
+                emission_source_reference = self._safe_get_cell(row, 8)  # Col9: 引用源
 
             return {
                 'number': number,
                 'category': category,
                 'emission_source': emission_source,
-                'facility': facility,
+                'facility': activity_name,  # 保持向后兼容
+                'activity_name': activity_name,
+                'geography': geography,
                 'ncv': 0,
                 'unit': unit,
                 'ox_rate': 0,
@@ -2079,6 +2317,7 @@ class ExcelDataReaderRefactored:
                 'CO2_emission_factor': ef_value,
                 'CH4_emission_factor': 0,
                 'N2O_emission_factor': 0,
+                'emission_source_reference': emission_source_reference,
             }
         except Exception as e:
             return {}
