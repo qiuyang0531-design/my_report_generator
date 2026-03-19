@@ -23,7 +23,17 @@
       "Bash(cp:*)",
       "Bash(mv:*)",
       "Bash(grep:*)",
-      "Bash(sed:*)"
+      "Bash(sed:*)",
+      "Bash(npm update:*)",
+      "Bash(npm install:*)",
+      "Bash(npm view:*)",
+      "Bash(claude update:*)",
+      "Bash(claude upgrade:*)",
+      "Bash(head:*)",
+      "Bash(del:*)",
+      "mcp__zai-mcp-server__extract_text_from_screenshot",
+      "Bash(chcp 65001:*)",
+      "Bash(python -c \":*)"
     ],
     "deny": [],
     "ask": []
