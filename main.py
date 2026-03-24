@@ -568,6 +568,39 @@ def prepare_context_with_formatting(context):
     formatted_context = final_string_clean(formatted_context)
     # ========== 最终清洗步骤结束 ==========
 
+    # ========== 计算总温室气体排放量（基于位置和基于市场） ==========
+    def safe_float(value):
+        """安全转换为浮点数"""
+        try:
+            return float(value) if value is not None else 0.0
+        except (ValueError, TypeError):
+            return 0.0
+
+    # 基于位置的总排放量 = 范围一 + 范围二（基于位置） + 范围三
+    location_based_total = (
+        safe_float(context.get('scope_1_emissions', 0)) +
+        safe_float(context.get('scope_2_location_based_emissions', 0)) +
+        safe_float(context.get('scope_3_emissions', 0))
+    )
+    formatted_context['location_based_total_green_house_gas_emissions'] = location_based_total
+    formatted_context['location_based_total_green_house_gas_emissions_formatted'] = format_number(location_based_total)
+
+    # 基于市场的总排放量 = 范围一 + 范围二（基于市场） + 范围三
+    market_based_total = (
+        safe_float(context.get('scope_1_emissions', 0)) +
+        safe_float(context.get('scope_2_market_based_emissions', 0)) +
+        safe_float(context.get('scope_3_emissions', 0))
+    )
+    formatted_context['market_based_total_green_house_gas_emissions'] = market_based_total
+    formatted_context['market_based_total_green_house_gas_emissions_formatted'] = format_number(market_based_total)
+
+    # Debug output
+    import sys
+    print(f"[总排放量计算]", file=sys.stderr)
+    print(f"  基于位置的总排放量: {format_number(location_based_total)} 吨CO2e", file=sys.stderr)
+    print(f"  基于市场的总排放量: {format_number(market_based_total)} 吨CO2e", file=sys.stderr)
+    # ========== 总排放量计算结束 ==========
+
     return formatted_context
 
 
@@ -1052,27 +1085,27 @@ def clean_empty_category_tables(doc, context):
     print(f"  已删除 {deleted_count} 个空类别相关段落")
 
     # 步骤4：删除空类别相关的表格
-    # 表格2-19对应范围三类别1-15的排放因子表，需要根据空类别列表删除相应表格
+    # 表格19-33对应范围三类别1-15的排放因子表，需要根据空类别列表删除相应表格
     tables_to_remove = []
 
     # 范围三类别表格索引映射（模板中的固定位置）
-    # 表格2-19分别对应类别1-15的排放因子表（5行x10列）
+    # 表格19-33分别对应类别1-15的排放因子表
     scope3_ef_table_mapping = {
-        1: 2,    # 表格2: 类别1
-        2: 3,    # 表格3: 类别2
-        3: 4,    # 表格4: 类别3
-        4: 5,    # 表格5: 类别4
-        5: 6,    # 表格6: 类别5
-        6: 7,    # 表格7: 类别6
-        7: 8,    # 表格8: 类别7
-        8: 9,    # 表格9: 类别8
-        9: 10,   # 表格10: 类别9
-        10: 11,  # 表格11: 类别10
-        11: 12,  # 表格12: 类别11
-        12: 13,  # 表格13: 类别12
-        13: 14,  # 表格14: 类别13
-        14: 15,  # 表格15: 类别14
-        15: 16,  # 表格16: 类别15
+        1: 19,   # 表格19: 类别1
+        2: 20,   # 表格20: 类别2
+        3: 21,   # 表格21: 类别3
+        4: 22,   # 表格22: 类别4
+        5: 23,   # 表格23: 类别5
+        6: 24,   # 表格24: 类别6
+        7: 25,   # 表格25: 类别7
+        8: 26,   # 表格26: 类别8
+        9: 27,   # 表格27: 类别9
+        10: 28,  # 表格28: 类别10
+        11: 29,  # 表格29: 类别11
+        12: 30,  # 表格30: 类别12
+        13: 31,  # 表格31: 类别13
+        14: 32,  # 表格32: 类别14
+        15: 33,  # 表格33: 类别15
     }
 
     # 找出需要删除的表格索引（基于空排放因子表）
@@ -1109,39 +1142,46 @@ def clean_empty_category_tables(doc, context):
                     tables_to_remove.append(table_idx)
                     print(f"  标记删除类别{cat_num}的排放因子表: 索引{table_idx}")
 
-    # 同时检查所有范围三类别表格（表格2-16），删除只有表头的表格
-    for table_idx in range(2, min(17, len(doc.tables))):
+    # 同时检查所有范围三类别表格（表格19-33），删除只有表头的表格
+    for table_idx in range(19, min(34, len(doc.tables))):
         if table_idx in tables_to_remove:
             continue  # 已经标记删除
 
         table = doc.tables[table_idx]
+        row_count = len(table.rows)
 
-        # 检查表格是否只有表头且没有实际数据（放宽条件到5行）
-        if len(table.rows) <= 5:
-            # 检查表格是否真的没有数据
+        # 首先检查表格行数，如果只有2行（表头+子表头），直接判定为空表格
+        if row_count <= 2:
+            tables_to_remove.append(table_idx)
+            print(f"  标记删除空表格: 索引{table_idx}（只有表头，行数={row_count}）")
+            continue
+
+        # 对于3-5行的表格，需要更仔细地检查是否有数据
+        if row_count <= 5:
+            # 定义表头关键词列表
+            header_keywords = ['编号', 'GHG排放类别', '排放源', 'Activity name',
+                             'Geography', 'CO2', 'CH4', 'N2O', '单位', '引用源',
+                             '排放因子', '缺省', '基于热值']
+
             has_data = False
-
-            # 检查除表头外的行是否有数值数据（CO2等排放量不为0）
-            for row_idx in range(1, len(table.rows)):
+            # 从第2行开始检查（跳过前两行表头）
+            for row_idx in range(2, min(row_count, 10)):
                 row = table.rows[row_idx]
-                # 检查排放量列（通常是第4-10列：CO2, CH4, N2O, HFCs, PFCs, SF6, NF3）
-                for col_idx in range(3, min(10, len(row.cells))):
-                    cell = row.cells[col_idx]
-                    text = cell.text.strip()
-                    if text:
-                        try:
-                            val = float(text.replace(',', ''))
-                            if val > 0:  # 有正的排放量数据
-                                has_data = True
-                                break
-                        except (ValueError, TypeError):
-                            pass
-                if has_data:
-                    break
+
+                # 检查第一列是否是数字编号（数据行的特征）
+                if len(row.cells) > 0:
+                    first_cell_text = row.cells[0].text.strip()
+                    try:
+                        num_val = float(first_cell_text)
+                        if num_val > 0:  # 有编号，说明有数据行
+                            has_data = True
+                            break
+                    except (ValueError, TypeError):
+                        pass
 
             if not has_data:
                 tables_to_remove.append(table_idx)
-                print(f"  标记删除空表格: 索引{table_idx}（只有表头，行数={len(table.rows)}）")
+                print(f"  标记删除空表格: 索引{table_idx}（只有表头，行数={row_count}）")
 
     # 从后往前删除表格
     for table_idx in sorted(tables_to_remove, reverse=True):
@@ -1297,108 +1337,94 @@ def clean_empty_category_tables_v2(doc, context):
     # 步骤3：删除空类别相关的表格
     tables_to_remove = []
 
-    # 范围三类别表格索引映射（模板中的固定位置）
-    # 表格2-16分别对应类别1-15的排放因子表
-    scope3_ef_table_mapping = {
-        1: 2,    # 表格2: 类别1
-        2: 3,    # 表格3: 类别2
-        3: 4,    # 表格4: 类别3
-        4: 5,    # 表格5: 类别4
-        5: 6,    # 表格6: 类别5
-        6: 7,    # 表格7: 类别6
-        7: 8,    # 表格8: 类别7
-        8: 9,    # 表格9: 类别8
-        9: 10,   # 表格10: 类别9
-        10: 11,  # 表格11: 类别10
-        11: 12,  # 表格12: 类别11
-        12: 13,  # 表格13: 类别12
-        13: 14,  # 表格14: 类别13
-        14: 15,  # 表格15: 类别14
-        15: 16,  # 表格16: 类别15
-    }
+    # 定义表头关键词列表
+    header_keywords = ['编号', 'GHG排放类别', '排放源', 'Activity name',
+                     'Geography', 'CO2', 'CH4', 'N2O', '单位', '引用源',
+                     '排放因子', '缺省', '基于热值']
 
-    # 找出需要删除的表格索引（基于空排放因子表）
+    # 动态查找每个类别对应的表格
+    category_table_indices = {}
+    for cat_num in range(1, 16):
+        # 在所有表格中查找属于该类别的表格
+        for table_idx in range(19, min(50, len(doc.tables))):  # 扩大搜索范围
+            if table_idx in category_table_indices.values():
+                continue  # 已经被其他类别占用
+
+            table = doc.tables[table_idx]
+            row_count = len(table.rows)
+
+            # 检查表格是否属于该类别
+            is_category_table = False
+            for row_idx in range(2, min(6, row_count)):  # 检查前几行
+                row = table.rows[row_idx]
+                for cell in row.cells:
+                    text = cell.text.strip()
+                    if f'范围三 类别{cat_num}' in text or f'范围三类别{cat_num}' in text:
+                        is_category_table = True
+                        break
+                if is_category_table:
+                    break
+
+            if is_category_table:
+                category_table_indices[cat_num] = table_idx
+                print(f"  [DEBUG] 类别{cat_num} -> 表格{table_idx}（行数={row_count}）")
+                break
+
+    # 检查哪些类别的表格需要删除
     for cat_num in empty_ef_table_categories:
-        if cat_num in scope3_ef_table_mapping:
-            table_idx = scope3_ef_table_mapping[cat_num]
+        if cat_num in category_table_indices:
+            table_idx = category_table_indices[cat_num]
             if table_idx < len(doc.tables):
                 table = doc.tables[table_idx]
-                # 检查表格是否只有表头（模板中默认5行，渲染后如果没有数据仍然是5行左右）
-                # 检查是否有实际数据：查看第2行之后是否有非空内容
-                has_data = False
-                has_wrong_category = False  # 检查是否有错误的类别数据
+                row_count = len(table.rows)
+                tables_to_remove.append(table_idx)
+                print(f"  标记删除类别{cat_num}的排放因子表: 索引{table_idx}（行数={row_count}）")
 
-                for row_idx in range(1, len(table.rows)):
-                    row = table.rows[row_idx]
-                    # 检查第一列是否包含类别编号
-                    if len(row.cells) > 0:
-                        first_cell_text = row.cells[0].text.strip()
-                        # 检查是否包含"范围三 类别X"或"类别X"
-                        if '类别' in first_cell_text:
-                            # 提取类别编号
-                            import re
-                            cat_match = re.search(r'类别(\d+)', first_cell_text)
-                            if cat_match:
-                                row_cat_num = int(cat_match.group(1))
-                                if row_cat_num != cat_num:
-                                    has_wrong_category = True
-                                    print(f"    [DEBUG] 第{row_idx}行有错误类别: 期望类别{cat_num}, 实际类别{row_cat_num}")
-
-                    # 检查排放量列（通常是第4-10列：CO2, CH4, N2O, HFCs, PFCs, SF6, NF3）
-                    for col_idx in range(3, min(10, len(row.cells))):
-                        cell = row.cells[col_idx]
-                        text = cell.text.strip()
-                        if text:
-                            try:
-                                val = float(text.replace(',', ''))
-                                if val > 0:  # 有正的排放量数据
-                                    has_data = True
-                                    break
-                            except (ValueError, TypeError):
-                                pass
-                    if has_data:
-                        break
-
-                # 如果没有数据，或者有错误的类别数据，则标记删除
-                should_delete = not has_data or has_wrong_category
-                print(f"  [DEBUG] 类别{cat_num}: 表格{table_idx}, 行数={len(table.rows)}, has_data={has_data}, has_wrong_category={has_wrong_category}")
-                if should_delete:
-                    tables_to_remove.append(table_idx)
-                    print(f"  标记删除类别{cat_num}的排放因子表: 索引{table_idx}（行数={len(table.rows)}）")
-
-    # 同时检查所有范围三类别表格（表格2-16），删除只有表头的表格
-    for table_idx in range(2, min(17, len(doc.tables))):
-        if table_idx in tables_to_remove:
-            continue  # 已经标记删除
+    # 同时检查所有范围三类别表格，删除明显的空表格
+    # 扩大搜索范围，确保覆盖所有可能的表格
+    for table_idx in range(26, min(len(doc.tables), len(doc.tables))):  # 搜索到文档末尾
+        if table_idx in tables_to_remove or table_idx in category_table_indices.values():
+            continue  # 已经处理过
 
         table = doc.tables[table_idx]
+        row_count = len(table.rows)
 
-        # 检查表格是否只有表头且没有实际数据（放宽条件到5行）
-        if len(table.rows) <= 5:
-            # 检查表格是否真的没有数据
-            has_data = False
-
-            # 检查除表头外的行是否有数值数据（CO2等排放量不为0）
-            for row_idx in range(1, len(table.rows)):
-                row = table.rows[row_idx]
-                # 检查排放量列（通常是第4-10列：CO2, CH4, N2O, HFCs, PFCs, SF6, NF3）
-                for col_idx in range(3, min(10, len(row.cells))):
-                    cell = row.cells[col_idx]
+        # 删除明显的空表格（行数<=3）
+        if row_count <= 3:
+            # 检查表格是否是范围三类别表格
+            is_scope3_table = False
+            for row in table.rows[:3]:  # 检查前3行
+                for cell in row.cells:
                     text = cell.text.strip()
-                    if text:
-                        try:
-                            val = float(text.replace(',', ''))
-                            if val > 0:  # 有正的排放量数据
-                                has_data = True
-                                break
-                        except (ValueError, TypeError):
-                            pass
-                if has_data:
+                    if 'GHG排放类别' in text or '范围三' in text:
+                        is_scope3_table = True
+                        break
+                if is_scope3_table:
                     break
+
+            if is_scope3_table:
+                tables_to_remove.append(table_idx)
+                print(f"  标记删除明显空表格: 索引{table_idx}（范围三表格，只有表头，行数={row_count}）")
+            continue
+
+        # 对于4-6行的表格，检查是否有数据行
+        if 4 <= row_count <= 6:
+            has_data = False
+            for row_idx in range(2, min(row_count, 10)):  # 从第2行开始检查
+                row = table.rows[row_idx]
+                if len(row.cells) > 0:
+                    first_cell_text = row.cells[0].text.strip()
+                    try:
+                        num_val = float(first_cell_text)
+                        if num_val > 0:  # 有编号，说明有数据行
+                            has_data = True
+                            break
+                    except (ValueError, TypeError):
+                        pass
 
             if not has_data:
                 tables_to_remove.append(table_idx)
-                print(f"  标记删除空表格: 索引{table_idx}（只有表头，行数={len(table.rows)}）")
+                print(f"  标记删除空表格: 索引{table_idx}（无数据行，行数={row_count}）")
 
     # 从后往前删除表格
     deleted_table_count = 0
@@ -1410,47 +1436,6 @@ def clean_empty_category_tables_v2(doc, context):
             deleted_table_count += 1
 
     print(f"  已删除 {deleted_table_count} 个空类别表格")
-
-    # 最终检查：删除后再次检查表格2-16，确保没有遗漏的空表格
-    #（因为删除后表格索引会变化，需要重新检查）
-    print(f"  [最终检查] 删除后重新检查表格2-16...")
-    final_tables_to_remove = []
-    for table_idx in range(2, min(17, len(doc.tables))):
-        table = doc.tables[table_idx]
-        if len(table.rows) <= 5:
-            # 检查是否有实际数据
-            has_data = False
-            for row_idx in range(1, len(table.rows)):
-                row = table.rows[row_idx]
-                for col_idx in range(3, min(10, len(row.cells))):
-                    cell = row.cells[col_idx]
-                    text = cell.text.strip()
-                    if text:
-                        try:
-                            val = float(text.replace(',', ''))
-                            if val > 0:
-                                has_data = True
-                                break
-                        except:
-                            pass
-                if has_data:
-                    break
-
-            if not has_data:
-                final_tables_to_remove.append(table_idx)
-                print(f"    [最终检查] 标记删除空表格: 索引{table_idx}（行数={len(table.rows)}）")
-
-    # 从后往前删除最终检查发现的空表格
-    final_deleted_count = 0
-    for table_idx in sorted(final_tables_to_remove, reverse=True):
-        if table_idx < len(doc.tables):
-            table = doc.tables[table_idx]
-            table_element = table._element
-            table_element.getparent().remove(table_element)
-            final_deleted_count += 1
-
-    if final_deleted_count > 0:
-        print(f"  已删除 {final_deleted_count} 个遗漏的空表格")
 
 
 def merge_vertical_cells(table, col_idx):
