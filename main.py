@@ -582,8 +582,9 @@ def prepare_context_with_formatting(context):
         safe_float(context.get('scope_2_location_based_emissions', 0)) +
         safe_float(context.get('scope_3_emissions', 0))
     )
-    formatted_context['location_based_total_green_house_gas_emissions'] = location_based_total
-    formatted_context['location_based_total_green_house_gas_emissions_formatted'] = format_number(location_based_total)
+    formatted_location_total = format_number(location_based_total)
+    formatted_context['location_based_total_green_house_gas_emissions'] = formatted_location_total
+    formatted_context['location_based_total_green_house_gas_emissions_formatted'] = formatted_location_total
 
     # 基于市场的总排放量 = 范围一 + 范围二（基于市场） + 范围三
     market_based_total = (
@@ -591,8 +592,9 @@ def prepare_context_with_formatting(context):
         safe_float(context.get('scope_2_market_based_emissions', 0)) +
         safe_float(context.get('scope_3_emissions', 0))
     )
-    formatted_context['market_based_total_green_house_gas_emissions'] = market_based_total
-    formatted_context['market_based_total_green_house_gas_emissions_formatted'] = format_number(market_based_total)
+    formatted_market_total = format_number(market_based_total)
+    formatted_context['market_based_total_green_house_gas_emissions'] = formatted_market_total
+    formatted_context['market_based_total_green_house_gas_emissions_formatted'] = formatted_market_total
 
     # Debug output
     import sys
@@ -1345,8 +1347,8 @@ def clean_empty_category_tables_v2(doc, context):
     # 动态查找每个类别对应的表格
     category_table_indices = {}
     for cat_num in range(1, 16):
-        # 在所有表格中查找属于该类别的表格
-        for table_idx in range(19, min(50, len(doc.tables))):  # 扩大搜索范围
+        # 在所有表格中查找属于该类别的表格（从表格4开始，包含范围三类别汇总表）
+        for table_idx in range(4, min(50, len(doc.tables))):  # 扩大搜索范围，包含表格4-18
             if table_idx in category_table_indices.values():
                 continue  # 已经被其他类别占用
 
@@ -1355,7 +1357,7 @@ def clean_empty_category_tables_v2(doc, context):
 
             # 检查表格是否属于该类别
             is_category_table = False
-            for row_idx in range(2, min(6, row_count)):  # 检查前几行
+            for row_idx in range(min(6, row_count)):  # 从第0行开始检查所有行
                 row = table.rows[row_idx]
                 for cell in row.cells:
                     text = cell.text.strip()
@@ -1370,8 +1372,8 @@ def clean_empty_category_tables_v2(doc, context):
                 print(f"  [DEBUG] 类别{cat_num} -> 表格{table_idx}（行数={row_count}）")
                 break
 
-    # 检查哪些类别的表格需要删除
-    for cat_num in empty_ef_table_categories:
+    # 检查哪些类别的表格需要删除（只删除完全没有数据的类别）
+    for cat_num in empty_categories:
         if cat_num in category_table_indices:
             table_idx = category_table_indices[cat_num]
             if table_idx < len(doc.tables):
