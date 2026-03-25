@@ -739,6 +739,13 @@ def generate_report_from_xlsx(
     doc.save(output_path)
     print("空类别表格清理完成")
 
+    # 9.4. 修复范围三类别标题缺失类别名称的问题
+    print(f"\n[步骤9.4] 修复范围三类别标题...")
+    fix_scope3_category_headers(doc)
+
+    doc.save(output_path)
+    print("范围三类别标题修复完成")
+
     # 9.5. 检查合并前的表格数据
     print(f"\n[步骤9.5] 检查合并前的表格数据...")
     check_table_before_merge(output_path)
@@ -1231,6 +1238,161 @@ def clean_empty_category_tables(doc, context):
 
     print(f"  彻底删除完成，共删除 {deleted_count} 个元素")
     print(f"  包括标题段落、单位段落、表格和孤立单位段落")
+
+    # 步骤6：删除孤立的"排放因子表"标题
+    # 这些标题在删除表格后变成了孤立的
+    orphan_headers_deleted = 0
+    paragraphs_list = list(doc.paragraphs)
+
+    # 获取有数据的类别列表
+    valid_categories = []
+    for i in range(1, 16):
+        ef_items = context.get(f'cat{i}_ef_items', [])
+        detail_items = context.get(f'scope3_category{i}', [])
+        emission_value = context.get(f'scope_3_category_{i}_emissions', 0)
+        if ef_items or detail_items or emission_value:
+            valid_categories.append(i)
+
+    for i, para in enumerate(paragraphs_list):
+        text = para.text.strip()
+        # 查找"范围三 类别X 排放因子表"标题
+        import re
+        match = re.search(r'范围三[^\d]*?(\d+)[^\d]*?排放因子表', text)
+        if match:
+            cat_num = int(match.group(1))
+            # 检查这个类别是否是有效类别
+            if cat_num not in valid_categories:
+                # 这是一个空类别的标题，需要删除
+                try:
+                    para_element = para._element
+                    parent = para_element.getparent()
+                    if parent is not None:
+                        parent.remove(para_element)
+                        orphan_headers_deleted += 1
+                        print(f"  删除孤立标题: 类别{cat_num}的排放因子表标题（无数据）")
+                except Exception as e:
+                    print(f"  删除孤立标题时出错: {e}")
+            else:
+                # 检查这个标题后面是否有表格（如果有数据，应该有表格）
+                # 检查后面是否有表格元素，而不仅仅是文本内容
+                has_table_after = False
+                para_element = para._element
+                current = para_element
+                # 检查后面10个元素
+                for _ in range(10):
+                    current = current.getnext()
+                    if current is None:
+                        break
+                    tag_name = current.tag.split('}')[-1] if '}' in current.tag else current.tag
+                    if tag_name == 'tbl':
+                        # 找到表格
+                        has_table_after = True
+                        break
+                    # 如果遇到下一个主要章节，停止查找
+                    elif tag_name == 'p':
+                        para_text = ''
+                        for t in current.iter():
+                            if t.tag.split('}')[-1] == 't' and t.text:
+                                para_text += t.text
+                        if para_text.strip() and ('量化排除' in para_text or '不确定性' in para_text or '数据分级' in para_text):
+                            # 遇到下一个章节，没有找到表格
+                            break
+
+                # 如果没有找到表格，说明表格未被渲染，标题应该删除
+                if not has_table_after:
+                    try:
+                        para_element = para._element
+                        parent = para_element.getparent()
+                        if parent is not None:
+                            parent.remove(para_element)
+                            orphan_headers_deleted += 1
+                            print(f"  删除孤立标题: 类别{cat_num}的排放因子表标题（未找到对应的表格）")
+                    except Exception as e:
+                        print(f"  删除孤立标题时出错: {e}")
+
+    if orphan_headers_deleted > 0:
+        print(f"  已删除 {orphan_headers_deleted} 个孤立的排放因子表标题")
+
+
+def fix_scope3_category_headers(doc):
+    """
+    修复第四章量化说明中范围三类别标题缺失类别名称的问题
+
+    修复内容：
+    - 将 "（一）" 替换为 "（一）购买的商品和服务"
+    - 将 "（二）" 替换为 "（二）资本货物"
+    - 其他类别的类似标题
+    """
+    print("  正在修复范围三类别标题...")
+
+    # 类别编号到名称的映射（与模板中的顺序对应）
+    category_names = {
+        '（一）': '购买的商品和服务',
+        '（二）': '资本货物',
+        '（三）': '燃料和能源相关活动',
+        '（四）': '上游运输和配送',
+        '（五）': '运营中产生的废弃物',
+        '（六）': '员工商务旅行',
+        '（七）': '员工通勤',
+        '（八）': '上游租赁资产',
+        '（九）': '下游运输和配送',
+        '（十）': '销售产品的加工',
+        '（十一）': '销售产品的使用',
+        '（十二）': '寿命终结处理',
+        '（十三）': '下游租赁资产',
+        '（十四）': '特许经营',
+        '（十五）': '投资'
+    }
+
+    # 找到"范围三：其他间接温室气体排放"的位置
+    scope3_section_start = None
+    paragraphs_list = list(doc.paragraphs)
+
+    for i, para in enumerate(paragraphs_list):
+        text = para.text.strip()
+        if '范围三' in text and '其他间接温室气体排放' in text:
+            scope3_section_start = i
+            break
+
+    if scope3_section_start is None:
+        print("    未找到范围三章节，跳过修复")
+        return
+
+    print(f"    找到范围三章节在段落 {scope3_section_start}")
+
+    # 在范围三章节内查找只有编号没有类别名称的标题
+    fixed_count = 0
+    for i in range(scope3_section_start + 1, len(paragraphs_list)):
+        text = paragraphs_list[i].text.strip()
+
+        # 检查是否是纯编号标题（只有"（X）"而没有其他内容）
+        if text in category_names:
+            # 检查下一段落是否是"（1）量化模型"等，确认这确实是一个类别标题
+            if i + 1 < len(paragraphs_list):
+                next_text = paragraphs_list[i + 1].text.strip()
+                if next_text.startswith('（1') or next_text.startswith('（2'):
+                    # 这是一个需要修复的类别标题
+                    full_title = f"{text}{category_names[text]}"
+                    para = paragraphs_list[i]
+
+                    # 清除段落内容
+                    for run in para.runs:
+                        run.text = ""
+
+                    # 添加新文本
+                    if para.runs:
+                        para.runs[0].text = full_title
+                    else:
+                        para.add_run(full_title)
+
+                    fixed_count += 1
+                    print(f"    修复段落{i}: '{text}' -> '{full_title}'")
+
+        # 如果到达下一个范围章节，停止处理
+        if text and ('第四章' in text or '参考文献' in text or '附录' in text):
+            break
+
+    print(f"    已修复 {fixed_count} 个范围三类别标题")
 
 
 def clean_empty_category_tables_v2(doc, context):
