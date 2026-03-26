@@ -673,6 +673,51 @@ def generate_report_from_xlsx(
     print(f"\n[步骤5] 保存报告到: {output_path}")
     template.save(output_path)
 
+    # 5.3. 检查类别12排放因子表是否被渲染
+    print(f"\n[步骤5.3] 检查类别12排放因子表...")
+    from docx import Document
+    doc_check = Document(output_path)
+    cat12_ef_found = False
+    cat11_ef_idx = None
+
+    # 首先找到类别11的表格
+    for i, table in enumerate(doc_check.tables):
+        for row in table.rows[:3]:
+            for cell in row.cells:
+                if '类别11' in cell.text and '排放因子' in cell.text:
+                    cat11_ef_idx = i
+                    print(f"  找到类别11排放因子表: 表格{i}")
+                    break
+            if cat11_ef_idx is not None:
+                break
+        if cat11_ef_idx is not None:
+            break
+
+    # 检查类别11之后的表格
+    if cat11_ef_idx is not None:
+        print(f"  检查类别11之后的表格（表格{cat11_ef_idx+1}到{min(cat11_ef_idx+3, len(doc_check.tables))}）")
+        for i in range(cat11_ef_idx+1, min(cat11_ef_idx+3, len(doc_check.tables))):
+            table = doc_check.tables[i]
+            first_cell = table.rows[0].cells[0].text[:40] if table.rows[0].cells else ''
+            row_count = len(table.rows)
+            print(f"    表格{i}: {row_count}行, 首单元格=\"{first_cell}\"")
+
+    # 搜索类别12
+    for i, table in enumerate(doc_check.tables):
+        for row in table.rows[:3]:
+            for cell in row.cells:
+                if '类别12' in cell.text and '排放因子' in cell.text:
+                    cat12_ef_found = True
+                    print(f"  找到类别12排放因子表: 表格{i}")
+                    break
+            if cat12_ef_found:
+                break
+        if cat12_ef_found:
+            break
+    if not cat12_ef_found:
+        print(f"  警告: 类别12排放因子表未被渲染!")
+        print(f"  文档中共有 {len(doc_check.tables)} 个表格")
+
     # 5.5. 检查模板渲染后的数据（调试用）
     print(f"\n[步骤5.5] 检查模板渲染后的数据...")
     check_template_rendering(output_path)
@@ -1094,27 +1139,28 @@ def clean_empty_category_tables(doc, context):
     print(f"  已删除 {deleted_count} 个空类别相关段落")
 
     # 步骤4：删除空类别相关的表格
-    # 表格19-33对应范围三类别1-15的排放因子表，需要根据空类别列表删除相应表格
+    # 表格26-40对应范围三类别1-15的排放因子表，需要根据空类别列表删除相应表格
     tables_to_remove = []
 
     # 范围三类别表格索引映射（模板中的固定位置）
-    # 表格19-33分别对应类别1-15的排放因子表
+    # 表格26-40分别对应类别1-15的排放因子表
+    # 注意：类别11使用燃烧格式（表格36），类别12使用通用格式（表格37）
     scope3_ef_table_mapping = {
-        1: 19,   # 表格19: 类别1
-        2: 20,   # 表格20: 类别2
-        3: 21,   # 表格21: 类别3
-        4: 22,   # 表格22: 类别4
-        5: 23,   # 表格23: 类别5
-        6: 24,   # 表格24: 类别6
-        7: 25,   # 表格25: 类别7
-        8: 26,   # 表格26: 类别8
-        9: 27,   # 表格27: 类别9
-        10: 28,  # 表格28: 类别10
-        11: 29,  # 表格29: 类别11
-        12: 30,  # 表格30: 类别12
-        13: 31,  # 表格31: 类别13
-        14: 32,  # 表格32: 类别14
-        15: 33,  # 表格33: 类别15
+        1: 26,   # 表格26: 类别1
+        2: 27,   # 表格27: 类别2
+        3: 28,   # 表格28: 类别3
+        4: 29,   # 表格29: 类别4
+        5: 30,   # 表格30: 类别5
+        6: 31,   # 表格31: 类别6
+        7: 32,   # 表格32: 类别7
+        8: 33,   # 表格33: 类别8
+        9: 34,   # 表格34: 类别9
+        10: 35,  # 表格35: 类别10
+        11: 36,  # 表格36: 类别11 (燃烧格式)
+        12: 37,  # 表格37: 类别12 (通用格式)
+        13: 38,  # 表格38: 类别13
+        14: 39,  # 表格39: 类别14
+        15: 40,  # 表格40: 类别15
     }
 
     # 找出需要删除的表格索引（基于空排放因子表）
@@ -1151,13 +1197,19 @@ def clean_empty_category_tables(doc, context):
                     tables_to_remove.append(table_idx)
                     print(f"  标记删除类别{cat_num}的排放因子表: 索引{table_idx}")
 
-    # 同时检查所有范围三类别表格（表格19-33），删除只有表头的表格
-    for table_idx in range(19, min(34, len(doc.tables))):
+    # 同时检查所有范围三类别表格（表格26-40），删除只有表头的表格
+    print(f"  [后处理] 检查表格26-40（文档共有{len(doc.tables)}个表格）")
+    for table_idx in range(26, min(41, len(doc.tables))):
         if table_idx in tables_to_remove:
             continue  # 已经标记删除
 
         table = doc.tables[table_idx]
         row_count = len(table.rows)
+
+        # 调试：打印表格信息
+        if row_count <= 6:
+            first_cell = table.rows[0].cells[0].text[:30] if table.rows[0].cells else ''
+            print(f"  [后处理] 表格{table_idx}: {row_count}行, 首单元格=\"{first_cell}\"")
 
         # 首先检查表格行数，如果只有2行（表头+子表头），直接判定为空表格
         if row_count <= 2:
@@ -1438,6 +1490,204 @@ def fix_scope3_category_headers(doc):
             break
 
     print(f"    已修复 {fixed_count} 个范围三类别标题")
+
+
+def insert_cat12_emission_factor_table(doc, after_table_idx, cat12_items):
+    """
+    手动插入类别12排放因子表及其小标题
+
+    Args:
+        doc: Word文档对象
+        after_table_idx: 在此表格索引后插入新表格
+        cat12_items: 类别12的排放因子数据
+    """
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+
+    # 获取插入位置的表格元素
+    if after_table_idx >= len(doc.tables):
+        print(f"  错误: 表格索引{after_table_idx}超出范围")
+        return
+
+    ref_table = doc.tables[after_table_idx]
+    ref_table_element = ref_table._element
+    parent = ref_table_element.getparent()
+
+    # 步骤1：插入类别12的小标题段落
+    subtitle_para = OxmlElement('w:p')
+    subtitle_para.set(qn('w:rsidR'), '007D2F2A')
+    subtitle_para.set(qn('w:rsidRPr'), '007D2F2A')
+    subtitle_ppr = OxmlElement('w:pPr')
+    subtitle_jc = OxmlElement('w:jc')
+    subtitle_jc.set(qn('w:val'), 'left')
+    subtitle_ppr.append(subtitle_jc)
+
+    # 小标题文本
+    subtitle_r = OxmlElement('w:r')
+    subtitle_r.set(qn('w:rsidRPr'), '007D2F2A')
+    subtitle_rpr = OxmlElement('w:rPr')
+    subtitle_b = OxmlElement('w:b')
+    subtitle_rpr.append(subtitle_b)
+    subtitle_r.append(subtitle_rpr)
+
+    subtitle_t = OxmlElement('w:t')
+    subtitle_t.text = '范围三 类别12 售出产品报废产生的排放 排放因子表'
+    subtitle_r.append(subtitle_t)
+    subtitle_para.append(subtitle_r)
+    subtitle_para.append(subtitle_ppr)
+
+    # 在参考表格后插入小标题段落
+    parent.insert(parent.index(ref_table_element) + 1, subtitle_para)
+    print(f"  插入类别12小标题段落")
+
+    # 步骤2：创建新表格
+    new_tbl = OxmlElement('w:tbl')
+
+    # 添加表格属性
+    tbl_pr = _get_table_properties()
+    new_tbl.append(tbl_pr)
+
+    # 添加表格边框
+    tbl_borders = OxmlElement('w:tblBorders')
+
+    # 定义边框
+    for border_name in ['top', 'left', 'bottom', 'right', 'insideH', 'insideV']:
+        border = OxmlElement(f'w:{border_name}')
+        border.set(qn('w:val'), 'single')
+        border.set(qn('w:sz'), '4')
+        border.set(qn('w:space'), '0')
+        border.set(qn('w:color'), 'auto')
+        tbl_borders.append(border)
+
+    tbl_pr.append(tbl_borders)
+
+    # 第1行：主表头（8列）
+    tr1 = OxmlElement('w:tr')
+    tr1.set(qn('w:rsidR'), '007D2F2A')
+
+    headers_row1 = ['编号', 'GHG排放类别', '排放源', 'Activity name', 'Geography', 'CO2', 'CO2', '引用源']
+    for header in headers_row1:
+        tc = _create_table_cell(header, is_header=True)
+        tr1.append(tc)
+    new_tbl.append(tr1)
+
+    # 第2行：子表头（8列，前5列空，后3列有内容）
+    tr2 = OxmlElement('w:tr')
+    tr2.set(qn('w:rsidR'), '007D2F2A')
+
+    headers_row2 = ['', '', '', '', '', '排放因子', '单位', '缺省排放因子']
+    for header in headers_row2:
+        tc = _create_table_cell(header, is_header=True)
+        tr2.append(tc)
+    new_tbl.append(tr2)
+
+    # 数据行
+    for item in cat12_items:
+        tr = OxmlElement('w:tr')
+        tr.set(qn('w:rsidR'), '007D2F2A')
+
+        cells = [
+            str(item.get('number', '')),
+            item.get('emission_source_type_cat12', ''),
+            item.get('emission_source_cat12', ''),
+            item.get('emission_name_cat12', ''),
+            item.get('emission_geo_cat12', ''),
+            str(item.get('cat12_emission_factor', '')),
+            item.get('cat12_emission_unit', ''),
+            item.get('cat12_emission_source', ''),
+        ]
+
+        for cell_text in cells:
+            tc = _create_table_cell(cell_text, is_header=False)
+            tr.append(tc)
+
+        new_tbl.append(tr)
+
+    # 在小标题段落后插入表格
+    parent.insert(parent.index(subtitle_para) + 1, new_tbl)
+    print(f"  成功插入类别12排放因子表（{len(cat12_items)}行数据，8列）")
+
+
+def _get_table_properties():
+    """获取表格属性XML"""
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+
+    tbl_pr = OxmlElement('w:tblPr')
+    tbl_pr.set(qn('w:tblStyle'), 'TableGrid')
+
+    # 表格宽度
+    tbl_w = OxmlElement('w:tblW')
+    tbl_w.set(qn('w:w'), '0')
+    tbl_w.set(qn('w:type'), 'auto')
+    tbl_pr.append(tbl_w)
+
+    # 添加表格网格定义（8列，每列等宽）
+    tbl_grid = OxmlElement('w:tblGrid')
+    for i in range(8):
+        grid_col = OxmlElement('w:gridCol')
+        grid_col.set(qn('w:w'), '1250')  # 每列宽度
+        tbl_grid.append(grid_col)
+    tbl_pr.append(tbl_grid)
+
+    return tbl_pr
+
+
+def _create_table_cell(text, is_header=False):
+    """创建表格单元格"""
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+
+    tc = OxmlElement('w:tc')
+    tc_pr = OxmlElement('w:tcPr')
+    tc_w = OxmlElement('w:tcW')
+    tc_w.set(qn('w:w'), '882')
+    tc_w.set(qn('w:type'), 'pct')
+    tc_pr.append(tc_w)
+
+    # 边框
+    tc_borders = OxmlElement('w:tcBorders')
+    for border_pos in ['top', 'left', 'bottom', 'right']:
+        border = OxmlElement(f'w:{border_pos}')
+        border.set(qn('w:val'), 'nil' if is_header else 'single')
+        if not is_header and border_pos in ['top', 'left']:
+            border.set(qn('w:val'), 'single')
+            border.set(qn('w:sz'), '4')
+            border.set(qn('w:space'), '0')
+            border.set(qn('w:color'), 'auto')
+        tc_borders.append(border)
+
+    tc_pr.append(tc_borders)
+    tc.append(tc_pr)
+
+    # 段落
+    p = OxmlElement('w:p')
+    p.set(qn('w:rsidR'), '007D2F2A')
+    p.set(qn('w:rsidRPr'), '007D2F2A')
+    p_pr = OxmlElement('w:pPr')
+    p_jc = OxmlElement('w:jc')
+    p_jc.set(qn('w:val'), 'center' if is_header else 'left')
+    p_pr.append(p_jc)
+    p.append(p_pr)
+
+    # 文本
+    r = OxmlElement('w:r')
+    r.set(qn('w:rsidRPr'), '007D2F2A')
+    r_pr = OxmlElement('w:rPr')
+    if is_header:
+        # 表头使用加粗
+        b = OxmlElement('w:b')
+        r_pr.append(b)
+    r.append(r_pr)
+
+    t = OxmlElement('w:t')
+    t.text = text
+    r.append(t)
+    p.append(r)
+
+    tc.append(p)
+
+    return tc
 
 
 def clean_empty_category_tables_v2(doc, context):
@@ -2142,6 +2392,56 @@ def merge_other_tables_vertical_cells(doc, context):
                     traceback.print_exc()
 
     print(f"  范围三类别表格合并总计：合并了 {total_merged} 个单元格")
+
+    # 步骤4：检查并插入缺失的类别12排放因子表
+    print(f"\\n  [步骤4] 检查类别12排放因子表...")
+    cat12_items = context.get('cat12_ef_items', [])
+
+    if cat12_items:
+        # 检查是否已有类别12排放因子表
+        has_cat12_table = False
+        cat12_table_idx = None
+
+        for i, table in enumerate(doc.tables):
+            for row in table.rows[:3]:
+                for cell in row.cells:
+                    if '类别12' in cell.text and '排放因子' in cell.text:
+                        has_cat12_table = True
+                        cat12_table_idx = i
+                        break
+                if has_cat12_table:
+                    break
+            if has_cat12_table:
+                break
+
+        if not has_cat12_table:
+            print(f"  警告: 类别12有数据({len(cat12_items)}条)但无表格，尝试插入...")
+
+            # 找到类别11的排放因子表（更宽松的搜索条件）
+            cat11_table_idx = None
+            for i, table in enumerate(doc.tables):
+                # 检查表格是否有"外销产品使用"或"cat11"相关内容
+                table_text = ''
+                for row in table.rows[:5]:
+                    for cell in row.cells:
+                        table_text += cell.text + ' '
+
+                if '外销产品使用' in table_text or 'cat11' in table_text.lower():
+                    # 进一步确认这是排放因子表（有"Activity name"或"低位发热量"等列）
+                    if 'Activity name' in table_text or '低位发热量' in table_text:
+                        cat11_table_idx = i
+                        break
+
+            if cat11_table_idx is not None:
+                print(f"  找到类别11表格: 索引{cat11_table_idx}，在其后插入类别12表格")
+                # 在类别11表格后插入类别12表格
+                insert_cat12_emission_factor_table(doc, cat11_table_idx, cat12_items)
+            else:
+                print(f"  错误: 未找到类别11排放因子表，无法确定插入位置")
+        else:
+            print(f"  类别12排放因子表已存在: 表格{cat12_table_idx}")
+    else:
+        print(f"  类别12无数据，跳过")
 
 
 def merge_table_vertical_cells(doc, context):
