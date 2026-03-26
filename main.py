@@ -1494,7 +1494,7 @@ def fix_scope3_category_headers(doc):
 
 def insert_cat12_emission_factor_table(doc, after_table_idx, cat12_items):
     """
-    手动插入类别12排放因子表及其小标题
+    手动插入类别12排放因子表（不插入小标题，模板中已有）
 
     Args:
         doc: Word文档对象
@@ -1513,34 +1513,7 @@ def insert_cat12_emission_factor_table(doc, after_table_idx, cat12_items):
     ref_table_element = ref_table._element
     parent = ref_table_element.getparent()
 
-    # 步骤1：插入类别12的小标题段落
-    subtitle_para = OxmlElement('w:p')
-    subtitle_para.set(qn('w:rsidR'), '007D2F2A')
-    subtitle_para.set(qn('w:rsidRPr'), '007D2F2A')
-    subtitle_ppr = OxmlElement('w:pPr')
-    subtitle_jc = OxmlElement('w:jc')
-    subtitle_jc.set(qn('w:val'), 'left')
-    subtitle_ppr.append(subtitle_jc)
-
-    # 小标题文本
-    subtitle_r = OxmlElement('w:r')
-    subtitle_r.set(qn('w:rsidRPr'), '007D2F2A')
-    subtitle_rpr = OxmlElement('w:rPr')
-    subtitle_b = OxmlElement('w:b')
-    subtitle_rpr.append(subtitle_b)
-    subtitle_r.append(subtitle_rpr)
-
-    subtitle_t = OxmlElement('w:t')
-    subtitle_t.text = '范围三 类别12 售出产品报废产生的排放 排放因子表'
-    subtitle_r.append(subtitle_t)
-    subtitle_para.append(subtitle_r)
-    subtitle_para.append(subtitle_ppr)
-
-    # 在参考表格后插入小标题段落
-    parent.insert(parent.index(ref_table_element) + 1, subtitle_para)
-    print(f"  插入类别12小标题段落")
-
-    # 步骤2：创建新表格
+    # 步骤1：创建新表格（小标题由模板提供，无需插入）
     new_tbl = OxmlElement('w:tbl')
 
     # 添加表格属性
@@ -1603,8 +1576,8 @@ def insert_cat12_emission_factor_table(doc, after_table_idx, cat12_items):
 
         new_tbl.append(tr)
 
-    # 在小标题段落后插入表格
-    parent.insert(parent.index(subtitle_para) + 1, new_tbl)
+    # 在参考表格后直接插入表格（小标题由模板提供）
+    parent.insert(parent.index(ref_table_element) + 1, new_tbl)
     print(f"  成功插入类别12排放因子表（{len(cat12_items)}行数据，8列）")
 
 

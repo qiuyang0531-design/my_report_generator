@@ -33,7 +33,9 @@
       "Bash(del:*)",
       "mcp__zai-mcp-server__extract_text_from_screenshot",
       "Bash(chcp 65001:*)",
-      "Bash(python -c \":*)"
+      "Bash(python -c \":*)",
+      "Bash(iconv -f gbk -t utf-8)",
+      "mcp__zai-mcp-server__analyze_image"
     ],
     "deny": [],
     "ask": []
