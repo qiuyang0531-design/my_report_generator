@@ -1360,6 +1360,51 @@ def fix_scope3_category_headers(doc):
 
     print(f"    找到范围三章节在段落 {scope3_section_start}")
 
+    # 新增：在范围三标题之前插入分组标题"（三）范围三其他类别相关排放"
+    # 检查是否已经有这个分组标题
+    has_group_header = False
+    for i in range(max(0, scope3_section_start - 3), scope3_section_start):
+        if i < len(paragraphs_list):
+            text = paragraphs_list[i].text.strip()
+            if '（三）' in text and ('范围三' in text or '其他类别' in text):
+                has_group_header = True
+                break
+
+    if not has_group_header:
+        # 在"范围三：其他间接温室气体排放"之前插入分组标题
+        target_para = paragraphs_list[scope3_section_start]
+
+        # 创建新段落
+        from docx.oxml import OxmlElement
+        from docx.oxml.ns import qn
+
+        new_para = OxmlElement('w:p')
+        pPr = OxmlElement('w:pPr')
+        jc = OxmlElement('w:jc')
+        jc.set(qn('w:val'), 'left')
+        pPr.append(jc)
+        new_para.append(pPr)
+
+        r = OxmlElement('w:r')
+        rPr = OxmlElement('w:rPr')
+        # 设置加粗
+        b = OxmlElement('w:b')
+        rPr.append(b)
+        # 设置字号
+        sz = OxmlElement('w:sz')
+        sz.set(qn('w:val'), '24')  # 12pt
+        rPr.append(sz)
+        r.append(rPr)
+
+        t = OxmlElement('w:t')
+        t.text = '（三）范围三其他类别相关排放'
+        r.append(t)
+        new_para.append(r)
+
+        # 在目标段落前插入新段落
+        target_para._element.addprevious(new_para)
+        print(f"    已在范围三章节前插入分组标题 '（三）范围三其他类别相关排放'")
+
     # 在范围三章节内查找只有编号没有类别名称的标题
     fixed_count = 0
     for i in range(scope3_section_start + 1, len(paragraphs_list)):
