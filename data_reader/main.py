@@ -29,6 +29,7 @@ from .readers import (
     Scope3Reader,
     EmissionFactorReader,
     ActivitySummaryReader,
+    ReductionActionReader,
 )
 
 
@@ -58,6 +59,7 @@ class ExcelDataReaderRefactored(BaseReader):
         self.scope3_reader = Scope3Reader(self.workbook)
         self.emission_factor_reader = EmissionFactorReader(self.workbook)
         self.activity_summary_reader = ActivitySummaryReader(self.workbook)
+        self.reduction_action_reader = ReductionActionReader(self.workbook)
 
     def get_all_context(self) -> Dict[str, Any]:
         """
@@ -83,6 +85,10 @@ class ExcelDataReaderRefactored(BaseReader):
         # ========== 提取范围二数据 ==========
         scope2_data = self.scope2_reader.extract_all()
         result.update(scope2_data)
+
+        # ========== 提取减排措施数据 ==========
+        reduction_action_data = self.reduction_action_reader.extract()
+        result.update(reduction_action_data)
 
         # ========== 添加 quantification_methods ==========
         if HAS_REPORT_CONFIG and result.get('company_name'):

@@ -6,6 +6,7 @@ from jinja2 import Environment
 import os
 import re
 from docx.oxml import OxmlElement
+from inventory_summary_generator import generate_inventory_context
 
 
 def to_chinese_num(n):
@@ -551,7 +552,97 @@ def prepare_context_with_formatting(context):
         21: '二十一', 22: '二十二', 23: '二十三', 24: '二十四', 25: '二十五',
         26: '二十六', 27: '二十七', 28: '二十八', 29: '二十九', 30: '三十'
     }
-    
+
+    # ========== 动态生成盘查边界描述文本 ==========
+    def format_category_numbers(categories):
+        """
+        将类别数字列表格式化为合并的字符串
+
+        例如：
+        [1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12] -> "1~7、9~12"
+        [1, 3, 5] -> "1、3、5"
+        [1, 2, 3] -> "1~3"
+        """
+        if not categories:
+            return ""
+
+        sorted_cats = sorted(categories)
+        result = []
+        start = sorted_cats[0]
+        end = sorted_cats[0]
+
+        for i in range(1, len(sorted_cats)):
+            if sorted_cats[i] == end + 1:
+                # 连续，扩展范围
+                end = sorted_cats[i]
+            else:
+                # 不连续，保存当前范围
+                if start == end:
+                    result.append(str(start))
+                else:
+                    result.append(f"{start}~{end}")
+                start = sorted_cats[i]
+                end = sorted_cats[i]
+
+        # 添加最后一个范围
+        if start == end:
+            result.append(str(start))
+        else:
+            result.append(f"{start}~{end}")
+
+        return "、".join(result)
+
+    def generate_included_scopes_text(context):
+        """
+        动态生成盘查边界描述文本
+
+        Returns:
+            格式化后的字符串，如 "范围一、范围二、范围三类别1~7、9~12"
+        """
+        parts = []
+
+        # 检查范围一
+        scope1_emissions = safe_float(context.get('scope_1_emissions', 0))
+        if scope1_emissions > 0:
+            parts.append("范围一")
+
+        # 检查范围二（基于位置或基于市场）
+        scope2_loc = safe_float(context.get('scope_2_location_based_emissions', 0))
+        scope2_mkt = safe_float(context.get('scope_2_market_based_emissions', 0))
+        if scope2_loc > 0 or scope2_mkt > 0:
+            parts.append("范围二")
+
+        # 检查范围三类别
+        valid_categories = []
+        for i in range(1, 16):
+            cat_emission = safe_float(context.get(f'scope_3_category_{i}_emissions', 0))
+            if cat_emission > 0:
+                valid_categories.append(i)
+
+        if valid_categories:
+            # 格式化类别数字
+            cats_text = format_category_numbers(valid_categories)
+            parts.append(f"范围三类别{cats_text}")
+
+        # 拼接所有部分
+        if parts:
+            return "、".join(parts)
+        else:
+            return "所有范围"  # 默认文本
+
+    # 添加 safe_float 辅助函数（如果还没有定义）
+    def safe_float(value):
+        """安全转换为浮点数"""
+        try:
+            return float(value) if value is not None else 0.0
+        except (ValueError, TypeError):
+            return 0.0
+
+    # 生成盘查边界描述文本
+    formatted_context['included_scopes_text'] = generate_included_scopes_text(context)
+    print(f"[盘查边界] 生成描述文本: {formatted_context['included_scopes_text']}")
+    # ========== 盘查边界描述文本生成结束 ==========
+
     # ========== 新增：最终字符串清洗步骤 ==========
     # 确保所有字符串值都已strip()，去除首尾空格
     def final_string_clean(d):
@@ -652,6 +743,199 @@ def generate_report_from_xlsx(
     print("\n[步骤3] 准备展示层数据（格式化数字）...")
     render_context = prepare_context_with_formatting(context)
 
+    # 3.5 生成基准年温室气体清单汇总数据
+    print("\n[步骤3.5] 生成基准年温室气体清单汇总数据...")
+
+    # ============================================================
+    # 辅助函数：安全转换 + 过滤合计行
+    # ============================================================
+    def safe_float(value):
+        """安全转换为浮点数"""
+        try:
+            # 移除千分位逗号
+            if isinstance(value, str):
+                value = value.replace(',', '')
+            return float(value) if value else 0.0
+        except (ValueError, TypeError):
+            return 0.0
+
+    def is_summary_row(item):
+        """检查是否为合计/小计行，需要过滤掉"""
+        # 检查多个可能的字段
+        for field in ['emission_source', 'category', 'name', 'number']:
+            value = str(item.get(field, '')).strip()
+            # 检查是否包含合计、小计、总计等关键字
+            if any(keyword in value for keyword in ['合计', '小计', '总计', '汇总', 'Total', 'Sum']):
+                return True
+        return False
+
+    # ============================================================
+    # 第一步：计算范围一的各项气体总和（从4个明细列表累加）
+    # ============================================================
+    scope1_lists = [
+        'scope1_stationary_combustion_emissions_items',  # 固定燃烧
+        'scope1_mobile_combustion_emissions_items',      # 移动燃烧
+        'scope1_fugitive_emissions_items',               # 逸散排放
+        'scope1_process_emissions_items',                # 制程排放
+    ]
+
+    # 初始化范围一累加器
+    scope1_sums = {
+        'co2': 0.0, 'ch4': 0.0, 'n2o': 0.0,
+        'hfcs': 0.0, 'pfcs': 0.0, 'sf6': 0.0, 'nf3': 0.0, 'total': 0.0
+    }
+
+    # 遍历4个明细列表，累加各项气体（过滤掉合计行）
+    filtered_count = 0
+    for list_name in scope1_lists:
+        items = context.get(list_name, [])
+        for item in items:
+            # 过滤掉合计/小计行
+            if is_summary_row(item):
+                filtered_count += 1
+                continue
+            scope1_sums['co2'] += safe_float(item.get('CO2_emissions'))
+            scope1_sums['ch4'] += safe_float(item.get('CH4_emissions'))
+            scope1_sums['n2o'] += safe_float(item.get('N2O_emissions'))
+            scope1_sums['hfcs'] += safe_float(item.get('HFCs_emissions'))
+            scope1_sums['pfcs'] += safe_float(item.get('PFCs_emissions'))
+            scope1_sums['sf6'] += safe_float(item.get('SFs_emissions'))  # 注意是SFs不是SF6
+            scope1_sums['nf3'] += safe_float(item.get('NF3_emissions'))
+            scope1_sums['total'] += safe_float(item.get('total_green_house_gas_emissions'))
+
+    # 使用context中的汇总值作为总计（更准确）
+    scope1_total_from_context = safe_float(context.get('scope_1_emissions', 0))
+    if scope1_total_from_context > 0:
+        scope1_sums['total'] = scope1_total_from_context
+
+    print(f"[范围一汇总] CO2: {scope1_sums['co2']:.2f}, CH4: {scope1_sums['ch4']:.2f}, 总计: {scope1_sums['total']:.2f}")
+    if filtered_count > 0:
+        print(f"[范围一汇总] 已过滤 {filtered_count} 个合计/小计行")
+
+    # ============================================================
+    # 第二步：构建 summary_raw_data
+    # ============================================================
+    # 提取范围二的两组数据（基于位置和基于市场）
+    scope2_loc_co2 = safe_float(context.get('scope_2_location_based_emissions', 0))
+    scope2_mar_co2 = safe_float(context.get('scope_2_market_based_emissions', 0))
+
+    summary_raw_data = {
+        # 范围一排放数据（使用计算出的总和）
+        'scope1_co2': scope1_sums['co2'],
+        'scope1_ch4': scope1_sums['ch4'],
+        'scope1_n2o': scope1_sums['n2o'],
+        'scope1_hfcs': scope1_sums['hfcs'],
+        'scope1_pfcs': scope1_sums['pfcs'],
+        'scope1_sf6': scope1_sums['sf6'],
+        'scope1_nf3': scope1_sums['nf3'],
+        'scope1_total': scope1_sums['total'],
+
+        # 范围二排放数据 - 基于位置
+        'scope2_loc_co2': scope2_loc_co2,
+        'scope2_loc_ch4': 0.0,
+        'scope2_loc_n2o': 0.0,
+        'scope2_loc_hfcs': 0.0,
+        'scope2_loc_pfcs': 0.0,
+        'scope2_loc_sf6': 0.0,
+        'scope2_loc_nf3': 0.0,
+        'scope2_loc_total': scope2_loc_co2,
+
+        # 范围二排放数据 - 基于市场
+        'scope2_mar_co2': scope2_mar_co2,
+        'scope2_mar_ch4': 0.0,
+        'scope2_mar_n2o': 0.0,
+        'scope2_mar_hfcs': 0.0,
+        'scope2_mar_pfcs': 0.0,
+        'scope2_mar_sf6': 0.0,
+        'scope2_mar_nf3': 0.0,
+        'scope2_mar_total': scope2_mar_co2,
+    }
+
+    # ============================================================
+    # 第三步：添加范围三类别数据
+    # 优先使用context中的汇总值，分项气体从明细累加（过滤合计行）
+    # ============================================================
+    for i in range(1, 16):
+        cat_key = f'cat{i}'
+        cat_list = context.get(f'scope3_category{i}', [])
+
+        # 累加该类别的各项气体（过滤掉合计行）
+        cat_sums = {
+            'co2': 0.0, 'ch4': 0.0, 'n2o': 0.0,
+            'hfcs': 0.0, 'pfcs': 0.0, 'sf6': 0.0, 'nf3': 0.0, 'total': 0.0
+        }
+
+        cat_filtered_count = 0
+        for item in cat_list:
+            # 过滤掉合计/小计行
+            if is_summary_row(item):
+                cat_filtered_count += 1
+                continue
+            cat_sums['co2'] += safe_float(item.get('CO2_emissions'))
+            cat_sums['ch4'] += safe_float(item.get('CH4_emissions'))
+            cat_sums['n2o'] += safe_float(item.get('N2O_emissions'))
+            cat_sums['hfcs'] += safe_float(item.get('HFCs_emissions'))
+            cat_sums['pfcs'] += safe_float(item.get('PFCs_emissions'))
+            cat_sums['sf6'] += safe_float(item.get('SFs_emissions'))  # 注意是SFs
+            cat_sums['nf3'] += safe_float(item.get('NF3_emissions'))
+            cat_sums['total'] += safe_float(item.get('total_green_house_gas_emissions'))
+
+        # 使用context中的汇总值作为总计（更准确）
+        cat_total_from_context = safe_float(context.get(f'scope_3_category_{i}_emissions', 0))
+        if cat_total_from_context > 0:
+            cat_sums['total'] = cat_total_from_context
+
+        summary_raw_data[cat_key] = cat_sums
+
+    print(f"[范围三汇总] 类别1 CO2: {summary_raw_data['cat1']['co2']:.2f}, 总计: {summary_raw_data['cat1']['total']:.2f}")
+
+    # 生成summary_data
+    summary_data = generate_inventory_context(summary_raw_data)
+    render_context['summary_data'] = summary_data
+    print("[汇总数据] 已添加到渲染上下文")
+
+    # 添加排放源明细数据到summary_data
+    # ============================================================
+    print("[步骤3.6] 添加排放源明细数据...")
+
+    # 范围一排放源明细（固定燃烧、移动燃烧、逸散排放、制程排放）
+    scope1_detail_lists = {
+        'stationary': context.get('scope1_stationary_combustion_emissions_items', []),
+        'mobile': context.get('scope1_mobile_combustion_emissions_items', []),
+        'fugitive': context.get('scope1_fugitive_emissions_items', []),
+        'process': context.get('scope1_process_emissions_items', []),
+    }
+    summary_data['scope1_detail'] = scope1_detail_lists
+    print(f"  [范围一明细] 固定燃烧: {len(scope1_detail_lists['stationary'])} 条")
+    print(f"  [范围一明细] 移动燃烧: {len(scope1_detail_lists['mobile'])} 条")
+    print(f"  [范围一明细] 逸散排放: {len(scope1_detail_lists['fugitive'])} 条")
+    print(f"  [范围一明细] 制程排放: {len(scope1_detail_lists['process'])} 条")
+
+    # 范围二排放源明细（外购能源间接排放）
+    summary_data['scope2_detail'] = {
+        'loc': context.get('indir_ef_items', []),  # 基于位置
+        'mkt': context.get('indir_ef_items', []),  # 基于市场（相同数据）
+    }
+    print(f"  [范围二明细] 外购能源: {len(summary_data['scope2_detail']['loc'])} 条")
+
+    # 范围三排放源明细（15个类别）
+    scope3_detail_lists = {}
+    for i in range(1, 16):
+        scope3_detail_lists[f'cat{i}'] = context.get(f'scope3_category{i}', [])
+    summary_data['scope3_detail'] = scope3_detail_lists
+    print(f"  [范围三明细] 共 {sum(len(v) for v in scope3_detail_lists.values())} 条明细")
+
+    # 活动数据汇总明细
+    summary_data['activity_summary_detail'] = {
+        'loc': context.get('activity_summary_items', []),   # 基于位置
+        'mkt': context.get('activity_summary_market_items', []),  # 基于市场
+    }
+    print(f"  [活动数据汇总] 基于位置: {len(summary_data['activity_summary_detail']['loc'])} 条")
+    print(f"  [活动数据汇总] 基于市场: {len(summary_data['activity_summary_detail']['mkt'])} 条")
+
+    # 更新render_context中的summary_data
+    render_context['summary_data'] = summary_data
+
     # 4. 渲染模板
     print("[步骤4] 渲染模板...")
     
@@ -666,7 +950,23 @@ def generate_report_from_xlsx(
     template.jinja_env = env
 
     print("[渲染] 已注册过滤器: cn_num, format_number, format_emission")
-    
+
+    # 调试：检查scope3_category10数据
+    print(f"[调试] scope3_category10 数据检查:")
+    print(f"  - 是否存在: {'scope3_category10' in render_context}")
+    if 'scope3_category10' in render_context:
+        cat10_data = render_context['scope3_category10']
+        print(f"  - 数据类型: {type(cat10_data)}")
+        print(f"  - 数据长度: {len(cat10_data) if isinstance(cat10_data, list) else 'N/A'}")
+        if isinstance(cat10_data, list) and len(cat10_data) > 0:
+            print(f"  - 第一条数据: {cat10_data[0]}")
+
+    # 调试：检查scope_3_category_10_emissions_display
+    print(f"[调试] scope_3_category_10_emissions_display 检查:")
+    print(f"  - scope_3_category_10_emissions: {render_context.get('scope_3_category_10_emissions', 'NOT FOUND')}")
+    print(f"  - scope_3_category_10_emissions_display: '{render_context.get('scope_3_category_10_emissions_display', 'NOT FOUND')}'")
+    print(f"  - 条件判断结果: {bool(render_context.get('scope_3_category_10_emissions_display', ''))}")
+
     template.render(render_context)
 
     # 5. 保存报告
@@ -776,6 +1076,126 @@ def generate_report_from_xlsx(
 
     doc.save(output_path)
     print("空行清理完成")
+
+    # 8.5. 调试：检查模板渲染后的类别10表格状态
+    print(f"\n[步骤8.5] 检查模板渲染后的类别10表格...")
+    cat10_found = False
+    for i, table in enumerate(doc.tables):
+        for row in table.rows:
+            for cell in row.cells:
+                if '3.10.1' in cell.text or '3.10.2' in cell.text:
+                    print(f"  找到类别10数据在表格{i}!")
+                    cat10_found = True
+                    break
+            if cat10_found:
+                break
+        if cat10_found:
+            break
+    if not cat10_found:
+        print("  警告：模板渲染后未找到类别10数据（3.10.1/3.10.2）")
+
+        # 变通方案：直接添加类别10库存表格到文档
+        if 'scope3_category10' in context:
+            cat10_items = context['scope3_category10']
+            print(f"  尝试直接添加类别10库存表格（{len(cat10_items)}条数据）...")
+
+            # 查找类别10标题段落后插入表格
+            inserted = False
+            for i, para in enumerate(doc.paragraphs):
+                if '10' in para.text and '销售产品加工' in para.text and '排放清册' in para.text:
+                    # 在此段落后插入新表格
+                    from docx.oxml import OxmlElement
+                    from docx.oxml.ns import qn
+
+                    # 获取段落元素
+                    para_elem = para._element
+                    parent = para_elem.getparent()
+
+                    # 获取段落索引
+                    elem_idx = list(parent).index(para_elem)
+
+                    # 创建表格
+                    table_xml = OxmlElement('{' + parent.nsmap['w'] + '}tbl')
+
+                    # 设置表格属性
+                    tbl_pr = OxmlElement('{' + parent.nsmap['w'] + '}tblPr')
+                    tbl_w = OxmlElement('{' + parent.nsmap['w'] + '}tblW')
+                    tbl_w.set(qn('w:type'), 'auto')
+                    tbl_pr.append(tbl_w)
+                    table_xml.append(tbl_pr)
+
+                    # 创建表格行（1行表头 + len(cat10_items)行数据 + 1行单位）
+                    for row_idx in range(len(cat10_items) + 2):
+                        tr = OxmlElement('{' + parent.nsmap['w'] + '}tr')
+
+                        # 创建单元格（4列：编号、排放源、温室气体排放量、CO2）
+                        for col_idx in range(4):
+                            tc = OxmlElement('{' + parent.nsmap['w'] + '}tc')
+                            tc_pr = OxmlElement('{' + parent.nsmap['w'] + '}tcPr')
+                            tc_w = OxmlElement('{' + parent.nsmap['w'] + '}tcW')
+                            tc_w.set(qn('w:type'), 'dxa')
+                            tc_w.set(qn('w:w'), '2000')
+                            tc_pr.append(tc_w)
+                            tc.append(tc_pr)
+
+                            # 创建段落
+                            p = OxmlElement('{' + parent.nsmap['w'] + '}p')
+                            p_pr = OxmlElement('{' + parent.nsmap['w'] + '}pPr')
+                            p.append(p_pr)
+
+                            # 创建文本运行
+                            r = OxmlElement('{' + parent.nsmap['w'] + '}r')
+                            t = OxmlElement('{' + parent.nsmap['w'] + '}t')
+
+                            # 设置文本内容
+                            if row_idx == 0:  # 表头行
+                                if col_idx == 0:
+                                    t.text = '编号'
+                                elif col_idx == 1:
+                                    t.text = '排放源'
+                                elif col_idx == 2:
+                                    t.text = '温室气体排放量'
+                                elif col_idx == 3:
+                                    t.text = 'CO2'
+                            elif row_idx == len(cat10_items) + 1:  # 单位行
+                                if col_idx == 2:
+                                    t.text = '单位：吨CO2e'
+                                else:
+                                    t.text = ''
+                            else:  # 数据行
+                                item_idx = row_idx - 1
+                                if item_idx < len(cat10_items):
+                                    item = cat10_items[item_idx]
+                                    if col_idx == 0:
+                                        t.text = item.get('number', '')
+                                    elif col_idx == 1:
+                                        t.text = item.get('emission_source', '')
+                                    elif col_idx == 2:
+                                        t.text = item.get('total_green_house_gas_emissions', '')
+                                    elif col_idx == 3:
+                                        t.text = item.get('CO2_emissions', '')
+                                else:
+                                    t.text = ''
+
+                            r.append(t)
+                            p.append(r)
+                            tc.append(p)
+                            tr.append(tc)
+
+                        table_xml.append(tr)
+
+                    # 在段落后插入表格
+                    parent.insert(elem_idx + 1, table_xml)
+                    inserted = True
+                    print(f"  成功在段落后添加类别10库存表格")
+                    break
+
+            if inserted:
+                # 重新加载文档以获取新表格
+                doc = Document(output_path)
+                print(f"  文档已重新加载，当前共有{len(doc.tables)}个表格")
+            else:
+                print(f"  无法找到插入位置")
 
     # 9. 删除没有数据的类别表格（仅删除标题段落，保留表格结构）
     print(f"\n[步骤9] 删除没有数据的类别表格...")
@@ -1542,10 +1962,7 @@ def clean_empty_category_tables_v2(doc, context):
 
     print(f"  空排放因子表类别: {empty_ef_table_categories}")  # 调试输出
 
-    # 合并两类需要删除的类别
-    categories_to_remove = list(set(empty_categories + empty_ef_table_categories))
-
-    if not categories_to_remove:
+    if not empty_categories and not empty_ef_table_categories:
         print("  所有类别都有数据，无需删除空类别标题")
         return
 
@@ -1555,16 +1972,16 @@ def clean_empty_category_tables_v2(doc, context):
     # 收集要删除的段落
     all_paragraphs_to_remove = []
 
-    # 步骤1：查找并删除空类别和空排放因子表的标题段落
+    # 步骤1：查找并删除完全空类别的标题段落（只删除真正空的类别，不删除只有EF表为空但有其他数据的类别）
     for para in doc.paragraphs:
         text = para.text.strip()
         if not text:
             continue
 
-        # 检查是否是空类别或空排放因子表相关的段落
+        # 只检查完全空类别（不包含只有EF表为空的类别）
         is_empty_category_para = False
 
-        for cat_num in categories_to_remove:
+        for cat_num in empty_categories:  # 只使用 empty_categories，不使用 empty_ef_table_categories
             category_name = category_names.get(cat_num, "")
             is_target_category = (
                 f'范围三 类别{cat_num}' in text or
@@ -1594,6 +2011,36 @@ def clean_empty_category_tables_v2(doc, context):
 
     print(f"  已删除 {deleted_count} 个空类别相关段落")
 
+    # 步骤2.5：删除孤立的单位描述段落（类别表格被删除后留下的单位描述）
+    # 这些段落通常只包含"单位：吨CO2e"或类似内容
+
+    # 删除孤立的单位列/段落
+    orphan_unit_paras = []
+    for para in doc.paragraphs:
+        text = para.text.strip()
+        # 检查是否是单位描述段落
+        if text in ['单位：吨CO2e', '单位: 吨CO2e', '单位：tCO2e', '单位: tCO2e', '单位：吨二氧化碳当量', '单位: 吨二氧化碳当量']:
+            # 检查这个段落是否在已删除类别的位置附近
+            # 通过检查前面是否有已删除类别的表格来判断
+            orphan_unit_paras.append(para)
+        # 也处理只有"单位"或"Unit"的情况
+        elif text in ['单位', 'Unit', '单位：', '单位:']:
+            orphan_unit_paras.append(para)
+
+    # 删除孤立的单位段落
+    for para in orphan_unit_paras:
+        try:
+            para_element = para._element
+            parent = para_element.getparent()
+            if parent is not None:
+                parent.remove(para_element)
+                deleted_count += 1
+        except Exception as e:
+            print(f"  删除单位段落时出错: {e}")
+
+    if orphan_unit_paras:
+        print(f"  已删除 {len(orphan_unit_paras)} 个孤立单位描述段落")
+
     # 步骤3：删除空类别相关的表格
     tables_to_remove = []
 
@@ -1602,12 +2049,13 @@ def clean_empty_category_tables_v2(doc, context):
                      'Geography', 'CO2', 'CH4', 'N2O', '单位', '引用源',
                      '排放因子', '缺省', '基于热值']
 
-    # 动态查找每个类别对应的表格
-    category_table_indices = {}
+    # 动态查找每个类别对应的表格（区分库存表和EF表）
+    category_inventory_table_indices = {}  # 库存表：包含3.10.1这类详细数据
+    category_ef_table_indices = {}  # EF表：包含排放因子数据
     for cat_num in range(1, 16):
         # 在所有表格中查找属于该类别的表格（从表格4开始，包含范围三类别汇总表）
-        for table_idx in range(4, min(50, len(doc.tables))):  # 扩大搜索范围，包含表格4-18
-            if table_idx in category_table_indices.values():
+        for table_idx in range(4, min(50, len(doc.tables))):
+            if table_idx in category_inventory_table_indices.values() or table_idx in category_ef_table_indices.values():
                 continue  # 已经被其他类别占用
 
             table = doc.tables[table_idx]
@@ -1615,35 +2063,70 @@ def clean_empty_category_tables_v2(doc, context):
 
             # 检查表格是否属于该类别
             is_category_table = False
-            for row_idx in range(min(6, row_count)):  # 从第0行开始检查所有行
+            is_inventory_table = False  # 是否是库存表（包含3.10.1这类编号）
+            is_ef_table = False  # 是否是EF表（包含排放因子相关列）
+
+            for row_idx in range(min(6, row_count)):
                 row = table.rows[row_idx]
                 for cell in row.cells:
                     text = cell.text.strip()
                     if f'范围三 类别{cat_num}' in text or f'范围三类别{cat_num}' in text:
                         is_category_table = True
-                        break
+                    # 检查是否包含详细数据编号（如3.10.1）
+                    if f'3.{cat_num}.' in text or f'3.{cat_num} ' in text:
+                        is_inventory_table = True
+                    # 检查是否是EF表（包含排放因子相关关键词）
+                    if any(keyword in text for keyword in ['排放因子', '缺省', '引用源', 'Activity name', 'Geography']):
+                        if f'类别{cat_num}' in text or f'范围{cat_num}' in text:
+                            is_ef_table = True
                 if is_category_table:
                     break
 
             if is_category_table:
-                category_table_indices[cat_num] = table_idx
-                print(f"  [DEBUG] 类别{cat_num} -> 表格{table_idx}（行数={row_count}）")
+                # 根据表格内容判断类型
+                if is_inventory_table:
+                    category_inventory_table_indices[cat_num] = table_idx
+                    print(f"  [DEBUG] 类别{cat_num} -> 库存表{table_idx}（行数={row_count}）")
+                elif is_ef_table:
+                    category_ef_table_indices[cat_num] = table_idx
+                    print(f"  [DEBUG] 类别{cat_num} -> EF表{table_idx}（行数={row_count}）")
+                else:
+                    # 如果无法确定类型，默认当作EF表
+                    category_ef_table_indices[cat_num] = table_idx
+                    print(f"  [DEBUG] 类别{cat_num} -> EF表{table_idx}（默认，行数={row_count}）")
                 break
 
-    # 检查哪些类别的表格需要删除（只删除完全没有数据的类别）
+    # 检查哪些类别的表格需要删除
+    # 1. 完全空类别（没有任何数据）- 删除所有相关表格
     for cat_num in empty_categories:
-        if cat_num in category_table_indices:
-            table_idx = category_table_indices[cat_num]
+        # 删除库存表
+        if cat_num in category_inventory_table_indices:
+            table_idx = category_inventory_table_indices[cat_num]
             if table_idx < len(doc.tables):
-                table = doc.tables[table_idx]
-                row_count = len(table.rows)
                 tables_to_remove.append(table_idx)
-                print(f"  标记删除类别{cat_num}的排放因子表: 索引{table_idx}（行数={row_count}）")
+                print(f"  标记删除类别{cat_num}的库存表（完全空类别）: 索引{table_idx}")
+        # 删除EF表
+        if cat_num in category_ef_table_indices:
+            table_idx = category_ef_table_indices[cat_num]
+            if table_idx < len(doc.tables) and table_idx not in tables_to_remove:
+                tables_to_remove.append(table_idx)
+                print(f"  标记删除类别{cat_num}的EF表（完全空类别）: 索引{table_idx}")
+
+    # 2. 只有EF表为空的类别（有详细数据或排放量）- 只删除EF表，保留库存表
+    for cat_num in empty_ef_table_categories:
+        if cat_num not in empty_categories:  # 跳过完全空类别（已处理）
+            # 只删除EF表，不删除库存表
+            if cat_num in category_ef_table_indices:
+                table_idx = category_ef_table_indices[cat_num]
+                if table_idx < len(doc.tables):
+                    tables_to_remove.append(table_idx)
+                    print(f"  标记删除类别{cat_num}的EF表（EF表为空但有库存数据）: 索引{table_idx}")
 
     # 同时检查所有范围三类别表格，删除明显的空表格
-    # 扩大搜索范围，确保覆盖所有可能的表格
-    for table_idx in range(26, min(len(doc.tables), len(doc.tables))):  # 搜索到文档末尾
-        if table_idx in tables_to_remove or table_idx in category_table_indices.values():
+    # 搜索从表格4开始的所有表格（第四章范围三表格从表格4开始）
+    all_category_tables = set(category_inventory_table_indices.values()) | set(category_ef_table_indices.values())
+    for table_idx in range(4, len(doc.tables)):  # 搜索所有范围三表格
+        if table_idx in tables_to_remove or table_idx in all_category_tables:
             continue  # 已经处理过
 
         table = doc.tables[table_idx]
@@ -1653,14 +2136,16 @@ def clean_empty_category_tables_v2(doc, context):
         if row_count <= 3:
             # 检查表格是否是范围三类别表格
             is_scope3_table = False
+            table_contains_unit_only = False  # 新增：标记表格只包含单位行
+
             for row in table.rows[:3]:
                 for cell in row.cells:
                     text = cell.text.strip()
                     if 'GHG排放类别' in text or '范围三' in text:
                         is_scope3_table = True
-                        break
-                if is_scope3_table:
-                    break
+                    # 检查是否只包含"单位：吨CO2e"这类内容
+                    if text in ['单位：吨CO2e', '单位: 吨CO2e', '单位：tCO2e', '单位: tCO2e']:
+                        table_contains_unit_only = True
 
             if is_scope3_table:
                 # 对于3行的表格，检查第3行是否有数据（编号>0或非空内容）
@@ -1674,45 +2159,147 @@ def clean_empty_category_tables_v2(doc, context):
                                 has_data = True
                                 break
                         except (ValueError, TypeError):
-                            # 检查是否有非空且有意义的文本（超过3个字符且不是表头关键词）
-                            if len(text) > 3 and text not in ['编号', 'GHG排放类别', '排放源', 'Activity name', 'Geography', 'CO2', 'CH4', 'N2O', '单位', '引用源', '缺省排放因子']:
+                            # 检查是否有非空且有意义的文本（超过3个字符且不是表头关键词或单位说明）
+                            if (len(text) > 3 and
+                                text not in ['编号', 'GHG排放类别', '排放源', 'Activity name',
+                                            'Geography', 'CO2', 'CH4', 'N2O', '单位', '引用源',
+                                            '缺省排放因子', '单位：吨CO2e', '单位: 吨CO2e',
+                                            '单位：tCO2e', '单位: tCO2e']):
                                 has_data = True
                                 break
 
-                if not has_data:
+                # 如果没有数据，或者表格只包含单位行，标记为删除
+                if not has_data or table_contains_unit_only:
                     tables_to_remove.append(table_idx)
-                    print(f"  标记删除明显空表格: 索引{table_idx}（范围三表格，只有表头，行数={row_count}）")
+                    print(f"  标记删除明显空表格: 索引{table_idx}（范围三表格，只有表头/单位行，行数={row_count}）")
             continue
 
         # 对于4-6行的表格，检查是否有数据行
         if 4 <= row_count <= 6:
             has_data = False
-            for row_idx in range(2, min(row_count, 10)):  # 从第2行开始检查
+            # 跳过最后可能的"单位"行
+            data_row_end = row_count - 1
+            for row_idx in range(2, data_row_end):  # 从第2行开始检查到倒数第二行
                 row = table.rows[row_idx]
                 if len(row.cells) > 0:
                     first_cell_text = row.cells[0].text.strip()
+                    # 跳过单位行
+                    if first_cell_text in ['单位：吨CO2e', '单位: 吨CO2e', '单位：tCO2e', '单位: tCO2e', '单位', 'Unit']:
+                        continue
                     try:
                         num_val = float(first_cell_text)
                         if num_val > 0:  # 有编号，说明有数据行
                             has_data = True
                             break
                     except (ValueError, TypeError):
-                        pass
+                        # 检查是否有非空且有意义的文本
+                        if len(first_cell_text) > 3:
+                            has_data = True
+                            break
 
             if not has_data:
                 tables_to_remove.append(table_idx)
                 print(f"  标记删除空表格: 索引{table_idx}（无数据行，行数={row_count}）")
+            continue
+
+        # 对于7行以上的表格，检查是否只有表头和单位行（没有实际数据）
+        if row_count >= 7:
+            has_real_data = False
+            # 从第2行开始检查，跳过可能的单位行
+            for row_idx in range(2, row_count - 1):
+                if row_idx >= len(table.rows):
+                    break
+                row = table.rows[row_idx]
+                if len(row.cells) > 0:
+                    first_cell_text = row.cells[0].text.strip()
+                    # 跳过单位行
+                    if first_cell_text in ['单位：吨CO2e', '单位: 吨CO2e', '单位：tCO2e', '单位: tCO2e', '单位', 'Unit']:
+                        continue
+                    try:
+                        num_val = float(first_cell_text)
+                        if num_val > 0:  # 有编号，说明有数据行
+                            has_real_data = True
+                            break
+                    except (ValueError, TypeError):
+                        # 检查是否有非空且有意义的文本
+                        if len(first_cell_text) > 3 and first_cell_text not in ['编号', 'GHG排放类别', '排放源', 'Activity name', 'Geography', 'CO2', 'CH4', 'N2O', '单位', '引用源']:
+                            has_real_data = True
+                            break
+
+            if not has_real_data:
+                tables_to_remove.append(table_idx)
+                print(f"  标记删除空表格: 索引{table_idx}（只有表头/单位行，行数={row_count}）")
 
     # 从后往前删除表格
     deleted_table_count = 0
+    deleted_title_count = 0
     for table_idx in sorted(tables_to_remove, reverse=True):
         if table_idx < len(doc.tables):
+            # 先查找并删除表格前面的标题段落
+            # EF表标题通常在表格前的一个段落，包含"排放因子表"字样
             table = doc.tables[table_idx]
+            table_element = table._element
+
+            # 获取表格在文档中的位置
+            # 通过遍历所有表格元素来找到当前表格的索引
+            all_table_elements = [t._element for t in doc.tables]
+            current_position = all_table_elements.index(table_element)
+
+            # 查找表格前可能存在的标题段落
+            # 遍历所有段落，找到在表格之前的最后一个段落
+            para_before_table = None
+            for para in doc.paragraphs:
+                para_element = para._element
+                para_position = -1
+                try:
+                    # 获取段落位置
+                    body = table_element.getparent().getparent()
+                    if hasattr(body, 'index'):
+                        para_position = body.index(para_element)
+                except:
+                    pass
+
+                # 简单方法：通过检查段落内容是否匹配EF表标题模式
+                para_text = para.text.strip()
+                if ('排放因子表' in para_text or 'EF表' in para_text) and para_text:
+                    # 检查是否是要删除类别的标题
+                    for deleted_cat in empty_categories + empty_ef_table_categories:
+                        if f'类别{deleted_cat}' in para_text or f'类别{deleted_cat}排放因子表' in para_text:
+                            # 检查这个段落是否在表格附近（通过检查它后面的元素是否是表格）
+                            # 获取段落的下一个兄弟元素
+                            next_sibling = para_element.getnext()
+                            if next_sibling is not None:
+                                # 检查下一个元素是否是当前表格或指向当前表格
+                                try:
+                                    next_table = next_sibling
+                                    # 检查是否是表格元素
+                                    if next_table.tag.endswith('}tbl'):
+                                        # 找到了标题段落
+                                        para_before_table = para
+                                        break
+                                except:
+                                    pass
+                    if para_before_table:
+                        break
+
+            # 删除标题段落
+            if para_before_table:
+                try:
+                    para_element = para_before_table._element
+                    parent = para_element.getparent()
+                    if parent is not None:
+                        parent.remove(para_element)
+                        deleted_title_count += 1
+                        print(f"  删除表格{table_idx}前的EF表标题段落")
+                except Exception as e:
+                    print(f"  删除标题段落时出错: {e}")
+
+            # 删除表格
             table_element = table._element
             table_element.getparent().remove(table_element)
             deleted_table_count += 1
 
-    print(f"  已删除 {deleted_table_count} 个空类别表格")
+    print(f"  已删除 {deleted_table_count} 个空类别表格和 {deleted_title_count} 个EF表标题段落")
 
 
 def merge_vertical_cells(table, col_idx):

@@ -41,6 +41,10 @@ class BasicInfoReader(BaseReader):
             'production_address': None,
             'reporting_period': None,
             'report_year': '2024',
+            'next_year': '2025',  # 明年
+            'producer': None,
+            'auditor': None,
+            'approver': None,
         }
 
         # 查找基本信息表
@@ -82,6 +86,11 @@ class BasicInfoReader(BaseReader):
                         # 从周期中提取年份
                         year_match = re.search(r'(\d{4})', str(value))
                         result['report_year'] = year_match.group(1) if year_match else '2024'
+                        # 计算明年
+                        try:
+                            result['next_year'] = str(int(result['report_year']) + 1)
+                        except (ValueError, TypeError):
+                            result['next_year'] = '2025'
                     elif key == 'document_number':
                         result['document_number'] = str(value).strip() if value else None
                     elif key in result:
@@ -104,6 +113,16 @@ class BasicInfoReader(BaseReader):
                             result['reporting_period'] = row[2]
                             year_match = re.search(r'(\d{4})', str(row[2]))
                             result['report_year'] = year_match.group(1) if year_match else '2024'
+                            # 计算明年
+                            try:
+                                result['next_year'] = str(int(result['report_year']) + 1)
+                            except (ValueError, TypeError):
+                                result['next_year'] = '2025'
+
+        # 将None值转换为空字符串（避免Jinja2渲染为"None"）
+        for key in result:
+            if result[key] is None:
+                result[key] = ''
 
         return result
 

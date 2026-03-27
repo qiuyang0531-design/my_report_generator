@@ -12,6 +12,7 @@ from .scope2 import Scope2Reader
 from .scope3 import Scope3Reader
 from .emission_factor import EmissionFactorReader
 from .activity_summary import ActivitySummaryReader
+from .reduction_action import ReductionActionReader
 
 
 __all__ = [
@@ -22,4 +23,5 @@ __all__ = [
     'Scope3Reader',
     'EmissionFactorReader',
     'ActivitySummaryReader',
+    'ReductionActionReader',
 ]
