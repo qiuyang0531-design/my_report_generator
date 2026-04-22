@@ -59,20 +59,54 @@ class BaseReader:
                 return sheet
         return None
 
+    def is_error_value(self, value) -> bool:
+        """检查是否为 Excel 错误值"""
+        if value is None:
+            return False
+        v_str = str(value).strip().upper()
+        return v_str in ['#REF!', '#VALUE!', '#DIV/0!', '#NAME?', '#N/A', '#NULL!', '#NUM!']
+
+    def natural_sort_key(self, s: str):
+        """用于编号（如 1.1, 1.10, 3.2.3）的自然排序键"""
+        import re
+        if not s:
+            return []
+        # 将字符串拆分为数字和非数字部分，并将数字部分转换为整数
+        return [int(text) if text.isdigit() else text.lower()
+                for text in re.split('([0-9]+)', str(s))]
+
     def safe_float(self, value) -> float:
-        """安全地转换为浮点数"""
+        """安全地转换为浮点数，处理 Excel 错误值"""
         try:
             if value is None:
                 return 0.0
+            
+            # 处理常见的 Excel 错误字符串
+            if isinstance(value, str):
+                v_str = value.strip().upper()
+                if v_str in ['#REF!', '#VALUE!', '#DIV/0!', '#NAME?', '#N/A', '#NULL!', '#NUM!']:
+                    return 0.0
+                # 去除逗号
+                v_str = v_str.replace(',', '')
+                if not v_str:
+                    return 0.0
+                return float(v_str)
+                
             return float(value)
         except (ValueError, TypeError):
             return 0.0
 
     def safe_str(self, value) -> str:
-        """安全地转换为字符串"""
+        """安全地转换为字符串，处理 Excel 错误值"""
         if value is None:
             return ''
-        return str(value).strip()
+        
+        v_str = str(value).strip()
+        # 处理常见的 Excel 错误字符串
+        if v_str.upper() in ['#REF!', '#VALUE!', '#DIV/0!', '#NAME?', '#N/A', '#NULL!', '#NUM!']:
+            return ''
+            
+        return v_str
 
     def safe_get_cell(self, row, col_idx):
         """安全获取单元格值"""

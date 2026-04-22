@@ -8,10 +8,69 @@ import re
 from docx.oxml import OxmlElement
 from inventory_summary_generator import generate_inventory_context
 
+DEFAULT_DY_XLSX_NAME = "DY-GHG-2026-01 大冶特殊钢-温室气体盘查清册-Update 20260317Protocol-tr-0408.xlsx"
+
+
+def _find_latest_inventory_xlsx(search_dirs):
+    candidates = []
+    for d in search_dirs:
+        if not d or not os.path.isdir(d):
+            continue
+        try:
+            for name in os.listdir(d):
+                if not name.lower().endswith(".xlsx"):
+                    continue
+                if name.startswith("~$"):
+                    continue
+                if "盘查清册" not in name:
+                    continue
+                if not name.startswith("DY-GHG-"):
+                    continue
+                full_path = os.path.join(d, name)
+                try:
+                    mtime = os.path.getmtime(full_path)
+                except OSError:
+                    continue
+                candidates.append((mtime, full_path))
+        except OSError:
+            continue
+
+    candidates.sort(key=lambda x: x[0], reverse=True)
+    return candidates[0][1] if candidates else None
+
+
+def resolve_inventory_xlsx_path(xlsx_path: str) -> str:
+    home_dir = os.path.expanduser("~")
+    search_dirs = [
+        os.getcwd(),
+        os.path.join(home_dir, "Desktop", "2026组织碳收资"),
+        os.path.join(home_dir, "Desktop", "2026组织碳收资", "更新文件"),
+    ]
+
+    is_default = xlsx_path == DEFAULT_DY_XLSX_NAME
+    latest = _find_latest_inventory_xlsx(search_dirs) if is_default else None
+
+    if xlsx_path and os.path.exists(xlsx_path):
+        if not is_default or not latest:
+            return xlsx_path
+        try:
+            if os.path.getmtime(xlsx_path) >= os.path.getmtime(latest):
+                return xlsx_path
+        except OSError:
+            return xlsx_path
+
+    if is_default and latest:
+        return latest
+
+    raise FileNotFoundError(
+        f"Excel 文件不存在: {xlsx_path}"
+        + (f"（已搜索目录: {search_dirs}）" if is_default else "")
+    )
+
+
 
 def to_chinese_num(n):
     """
-    将数字转换为中文大写数字（用于报告编号）
 
     Args:
         n: 数字 (1-15)
@@ -153,12 +212,18 @@ def prepare_context_with_formatting(context):
                 for col in emission_columns:
                     # 根据映射获取实际的数据键名
                     data_key = column_key_mapping.get(col, col)
-                    emission_str = item.get(data_key, '0')
-                    # 去除逗号和空格，转换为浮点数
-                    emission_str = emission_str.replace(',', '').replace(' ', '')
+                    val = item.get(data_key, 0)
+                    
+                    if val is None:
+                        val = 0
+                    
+                    # 确保转换为浮点数
                     try:
-                        emission_value = float(emission_str)
-                        column_sums[col] += emission_value
+                        if isinstance(val, str):
+                            val = float(val.replace(',', '').replace(' ', ''))
+                        else:
+                            val = float(val)
+                        column_sums[col] += val
                     except (ValueError, TypeError):
                         pass
 
@@ -434,6 +499,18 @@ def prepare_context_with_formatting(context):
             formatted_item = item.copy()
             is_valid_row = False  # 标记是否为有效数据行
 
+            # 处理编号列，保持整数形式
+            if 'number' in item:
+                v = item['number']
+                try:
+                    v_str = str(v)
+                    if v_str.endswith('.0') or re.match(r'^\d+\.0$', v_str):
+                        formatted_item['number'] = str(int(float(v)))
+                    else:
+                        formatted_item['number'] = v_str
+                except (ValueError, TypeError):
+                    formatted_item['number'] = str(v) if v is not None else ""
+
             # 为数值字段添加格式化版本
             for field in ef_fields_to_format:
                 if field in item:
@@ -486,6 +563,104 @@ def prepare_context_with_formatting(context):
         formatted_context['ef_CH4_emission_factor_sum_formatted'] = '0.00'
         formatted_context['ef_N2O_emission_factor_sum_formatted'] = '0.00'
 
+    # ========== 格式化范围二间接排放因子表 (indir_ef_items) ==========
+    if 'indir_ef_items' in context and context['indir_ef_items']:
+        formatted_indir_items = []
+        for item in context['indir_ef_items']:
+            formatted_item = item.copy()
+            # 处理编号列
+            if 'number' in item:
+                v = item['number']
+                try:
+                    v_str = str(v)
+                    if v_str.endswith('.0') or re.match(r'^\d+\.0$', v_str):
+                        formatted_item['number'] = str(int(float(v)))
+                    else:
+                        formatted_item['number'] = v_str
+                except (ValueError, TypeError):
+                    formatted_item['number'] = str(v) if v is not None else ""
+            
+            # 格式化数值字段
+            if 'elec_emission_factor' in item:
+                formatted_item['elec_emission_factor'] = format_number(item['elec_emission_factor'])
+            
+            formatted_indir_items.append(formatted_item)
+        formatted_context['indir_ef_items'] = formatted_indir_items
+        print(f"[范围二排放因子] 已格式化 indir_ef_items: {len(formatted_indir_items)} 行数据")
+
+    # ========== 格式化范围三各类别排放因子表 (cat1-cat15) ==========
+    for i in range(1, 16):
+        var_name = f'cat{i}_ef_items'
+        if var_name in context and context[var_name]:
+            formatted_items = []
+            for item in context[var_name]:
+                formatted_item = item.copy()
+                # 遍历所有字段，如果是数值则格式化
+                for k, v in item.items():
+                    if k == 'number':
+                        # 编号列保留为整数形式（去除 .00）
+                        try:
+                            formatted_item[k] = str(int(float(v))) if v is not None else ""
+                        except (ValueError, TypeError):
+                            formatted_item[k] = str(v) if v is not None else ""
+                    elif isinstance(v, (int, float)):
+                        formatted_item[k] = format_number(v)
+                formatted_items.append(formatted_item)
+            formatted_context[var_name] = formatted_items
+            print(f"[范围三排放因子] 已格式化 {var_name}: {len(formatted_items)} 行数据")
+
+    # ========== 格式化范围三排放明细表 (scope3_category1-15) ==========
+    for i in range(1, 16):
+        var_name = f'scope3_category{i}'
+        if var_name in context and context[var_name]:
+            formatted_items = []
+            for item in context[var_name]:
+                formatted_item = item.copy()
+                # 格式化所有列
+                for k, v in item.items():
+                    if k == 'number':
+                        # 编号列保持原样（如果是字符串如 3.1.1）或转为整数（如果是 1.0）
+                        try:
+                            # 只有当它是纯数字且带 .0 时才转为整数，否则保持原样（如 3.1.1）
+                            v_str = str(v)
+                            if v_str.endswith('.0') or re.match(r'^\d+\.0$', v_str):
+                                formatted_item[k] = str(int(float(v)))
+                            else:
+                                formatted_item[k] = v_str
+                        except (ValueError, TypeError):
+                            formatted_item[k] = str(v) if v is not None else ""
+                    elif isinstance(v, (int, float)):
+                        formatted_item[k] = format_number(v)
+                # 兼容 SF6/SFs
+                if 'SF6_emissions' in formatted_item:
+                    formatted_item['SFs_emissions'] = formatted_item['SF6_emissions']
+                formatted_items.append(formatted_item)
+            formatted_context[var_name] = formatted_items
+            print(f"[范围三明细] 已格式化 {var_name}: {len(formatted_items)} 行数据")
+
+    # ========== 格式化范围二排放明细表 (scope2_items) ==========
+    if 'scope2_items' in context and context['scope2_items']:
+        formatted_items = []
+        for item in context['scope2_items']:
+            formatted_item = item.copy()
+            for k, v in item.items():
+                if k == 'number':
+                    try:
+                        v_str = str(v)
+                        if v_str.endswith('.0') or re.match(r'^\d+\.0$', v_str):
+                            formatted_item[k] = str(int(float(v)))
+                        else:
+                            formatted_item[k] = v_str
+                    except (ValueError, TypeError):
+                        formatted_item[k] = str(v) if v is not None else ""
+                elif isinstance(v, (int, float)):
+                    formatted_item[k] = format_number(v)
+            if 'SF6_emissions' in formatted_item:
+                formatted_item['SFs_emissions'] = formatted_item['SF6_emissions']
+            formatted_items.append(formatted_item)
+        formatted_context['scope2_items'] = formatted_items
+        print(f"[范围二明细] 已格式化 scope2_items: {len(formatted_items)} 行数据")
+
     # ========== 格式化范围一直接排放源清册数据 ==========
     # 为 scope1 排放项中的数值字段添加格式化处理（2位小数 + 千分位符）
     # 确保零值显示为 "0.00" 而不是空字符串
@@ -519,6 +694,18 @@ def prepare_context_with_formatting(context):
             formatted_items = []
             for item in context[var_name]:
                 formatted_item = item.copy()
+
+                # 处理编号列，保持整数形式
+                if 'number' in item:
+                    v = item['number']
+                    try:
+                        v_str = str(v)
+                        if v_str.endswith('.0') or re.match(r'^\d+\.0$', v_str):
+                            formatted_item['number'] = str(int(float(v)))
+                        else:
+                            formatted_item['number'] = v_str
+                    except (ValueError, TypeError):
+                        formatted_item['number'] = str(v) if v is not None else ""
 
                 # 为每个排放量字段应用格式化
                 for field in scope1_emission_fields:
@@ -698,7 +885,7 @@ def prepare_context_with_formatting(context):
 
 
 def generate_report_from_xlsx(
-    xlsx_path="test_data.xlsx",
+    xlsx_path=DEFAULT_DY_XLSX_NAME,
     template_path="template.docx",
     output_path="carbon_report.docx"
 ):
@@ -715,6 +902,8 @@ def generate_report_from_xlsx(
     print("开始生成碳盘查报告（纯xlsx，动态读取）")
     print("=" * 50)
 
+    xlsx_path = resolve_inventory_xlsx_path(xlsx_path)
+
     # 1. 使用 data_reader 的协议驱动方法（重构版）
     print(f"\n[步骤1] 从 {xlsx_path} 动态提取数据...")
     reader = ExcelDataReader(xlsx_path)
@@ -728,6 +917,22 @@ def generate_report_from_xlsx(
     print(f"  范围二排放（基于位置）: {context.get('scope_2_location_based_emissions')}")
     print(f"  范围二排放（基于市场）: {context.get('scope_2_market_based_emissions')}")
     print(f"  范围三排放: {context.get('scope_3_emissions')}")
+
+    # 调试量化方法
+    print("\n量化方法配置检查:")
+    if 'quantification_methods' in context:
+        scope1_methods = context['quantification_methods'].get('scope_1', {})
+        print(f"  范围一方法数量: {len(scope1_methods)}")
+
+        if 'gasoline_transport' in scope1_methods:
+            gasoline_ef = scope1_methods['gasoline_transport']['ef']
+            print(f"  汽油EF配置: {gasoline_ef}")
+
+        if 'diesel_transport' in scope1_methods:
+            diesel_ef = scope1_methods['diesel_transport']['ef']
+            print(f"  柴油EF配置: {diesel_ef}")
+    else:
+        print("  未找到quantification_methods")
 
     print("\n范围三分类排放量:")
     for i in range(1, 16):  # 范围三共15个类别
@@ -882,8 +1087,16 @@ def generate_report_from_xlsx(
 
         # 使用context中的汇总值作为总计（更准确）
         cat_total_from_context = safe_float(context.get(f'scope_3_category_{i}_emissions', 0))
+        gas_sum = sum(cat_sums[g] for g in ['co2', 'ch4', 'n2o', 'hfcs', 'pfcs', 'sf6', 'nf3'])
+        
         if cat_total_from_context > 0:
             cat_sums['total'] = cat_total_from_context
+        elif gas_sum > 0:
+            cat_sums['total'] = gas_sum
+        
+        # 确保总计不小于分项气体之和（修正可能的四舍五入误差）
+        if gas_sum > cat_sums['total']:
+            cat_sums['total'] = gas_sum
 
         summary_raw_data[cat_key] = cat_sums
 
@@ -1279,7 +1492,7 @@ def check_template_rendering(doc_path):
 
         # 检查 scope1 排放数据
         print(f"  scope1_stationary_combustion_emissions_items 前3条数据:")
-        reader = ExcelDataReader('test_data.xlsx')
+        reader = ExcelDataReader('DY-GHG-2026-01 大冶特殊钢-温室气体盘查清册-Update 20260317Protocol-tr-0408.xlsx')
         data = reader.get_all_context()
         scope1_items = data.get('scope1_stationary_combustion_emissions_items', [])
         for i, item in enumerate(scope1_items[:3]):
@@ -2072,18 +2285,18 @@ def clean_empty_category_tables_v2(doc, context):
                     text = cell.text.strip()
                     if f'范围三 类别{cat_num}' in text or f'范围三类别{cat_num}' in text:
                         is_category_table = True
-                    # 检查是否包含详细数据编号（如3.10.1）
+                    # 检查是否包含详细数据编号（如3.10.1）- 库存表判断
                     if f'3.{cat_num}.' in text or f'3.{cat_num} ' in text:
                         is_inventory_table = True
-                    # 检查是否是EF表（包含排放因子相关关键词）
-                    if any(keyword in text for keyword in ['排放因子', '缺省', '引用源', 'Activity name', 'Geography']):
+                    # 检查是否是EF表（包含排放因子相关关键词）- 只有在不是库存表的情况下才判断
+                    if not is_inventory_table and any(keyword in text for keyword in ['排放因子', '缺省', '引用源', 'Activity name', 'Geography']):
                         if f'类别{cat_num}' in text or f'范围{cat_num}' in text:
                             is_ef_table = True
                 if is_category_table:
                     break
 
             if is_category_table:
-                # 根据表格内容判断类型
+                # 根据表格内容判断类型 - 确保库存表优先级最高
                 if is_inventory_table:
                     category_inventory_table_indices[cat_num] = table_idx
                     print(f"  [DEBUG] 类别{cat_num} -> 库存表{table_idx}（行数={row_count}）")
@@ -2091,10 +2304,27 @@ def clean_empty_category_tables_v2(doc, context):
                     category_ef_table_indices[cat_num] = table_idx
                     print(f"  [DEBUG] 类别{cat_num} -> EF表{table_idx}（行数={row_count}）")
                 else:
-                    # 如果无法确定类型，默认当作EF表
-                    category_ef_table_indices[cat_num] = table_idx
-                    print(f"  [DEBUG] 类别{cat_num} -> EF表{table_idx}（默认，行数={row_count}）")
-                break
+                    # 如果无法确定类型，先检查是否有类似3.X.Y的编号模式，再决定类型
+                    has_detail_number_pattern = False
+                    for row_idx in range(min(6, row_count)):
+                        row = table.rows[row_idx]
+                        for cell in row.cells:
+                            text = cell.text.strip()
+                            if re.search(r'3\.\d+\.\d+', text):
+                                has_detail_number_pattern = True
+                                break
+                        if has_detail_number_pattern:
+                            break
+
+                    if has_detail_number_pattern:
+                        category_inventory_table_indices[cat_num] = table_idx
+                        print(f"  [DEBUG] 类别{cat_num} -> 库存表{table_idx}（行数={row_count}，模式匹配）")
+                    else:
+                        category_ef_table_indices[cat_num] = table_idx
+                        print(f"  [DEBUG] 类别{cat_num} -> EF表{table_idx}（默认，行数={row_count}）")
+                
+                # 注意：不要 break，继续寻找该类别的其他表格（一个类别可能有 EF 表和 库存表）
+                # continue
 
     # 检查哪些类别的表格需要删除
     # 1. 完全空类别（没有任何数据）- 删除所有相关表格
@@ -2891,7 +3121,7 @@ if __name__ == "__main__":
     # 检查命令行参数
     if len(sys.argv) > 1 and sys.argv[1] == '--generate':
         # 生成报告模式
-        xlsx_path = sys.argv[2] if len(sys.argv) > 2 else "test_data.xlsx"
+        xlsx_path = sys.argv[2] if len(sys.argv) > 2 else DEFAULT_DY_XLSX_NAME
         output_path = sys.argv[3] if len(sys.argv) > 3 else "carbon_report.docx"
         generate_report_from_xlsx(xlsx_path=xlsx_path, output_path=output_path)
     else:

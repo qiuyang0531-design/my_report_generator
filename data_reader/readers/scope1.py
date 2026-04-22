@@ -122,10 +122,7 @@ class Scope1Reader(BaseReader):
 
     def _extract_detail_from_inventory_sheet(self) -> Dict[str, Any]:
         """
-        从温室气体盘查清册表中提取范围一详细表数据
-
-        参考原始代码 data_reader.py 的 extract_data_from_xlsx_dynamic 方法
-        从"温室气体盘查清册表"中提取范围一的详细排放源数据
+        从温室气体盘查清册表中提取范围一详细表数据，确保排序与工作表一致
         """
         result = {
             'scope1_stationary_combustion_emissions_items': [],
@@ -134,111 +131,167 @@ class Scope1Reader(BaseReader):
             'scope1_process_emissions_items': [],
         }
 
-        # 查找温室气体盘查清册表
-        inventory_sheet = self.find_sheet_by_name('盘查清册', '清册')
+        # 查找所有可能的盘查清册表
+        inventory_sheets = []
+        for sheet_name in self.workbook.sheetnames:
+            if '盘查清册' in sheet_name or '清册' in sheet_name:
+                inventory_sheets.append(self.workbook[sheet_name])
 
-        if not inventory_sheet:
-            print("[范围一详细] 未找到温室气体盘查清册表")
+        if not inventory_sheets:
+            print("[范围一详细] 未找到任何温室气体盘查清册表")
             return result
 
-        print(f"[范围一详细] 找到温室气体盘查清册表: {inventory_sheet.title}")
-        scope1_detail_items = []
+        sheet_by_title = {s.title: s for s in inventory_sheets}
+        preferred_sheet = sheet_by_title.get('温室气体盘查清册') or inventory_sheets[0]
+        preferred_title = preferred_sheet.title
 
-        # 从第14行开始（第12行是标题，第13行是单位）
-        # 维护当前类别用于前向填充（ffill）
+        preferred_number_order: List[str] = []
         current_category = ""
-        current_sub_category = ""
-
-        for row in inventory_sheet.iter_rows(min_row=14):
+        for row in preferred_sheet.iter_rows(min_row=14):
             if len(row) < 13:
                 continue
 
-            # Excel结构：A=空, B=编号/类别名, C=排放源, D=排放设施, E=备注, F=总排放量, G=CO2, H=CH4, I=N2O, J=HFCs, K=PFCs, L=SF6, M=NF3
-            col_b = row[1].value        # 编号或类别名
-            col_c = row[2].value        # 排放源（仅数据行有值）
-            facility = row[3].value      # 排放设施 (列D)
-            note = row[4].value          # 备注 (列E)
-            total_emission = row[5].value    # 总排放量 (列F)
-            co2_emission = row[6].value      # CO2排放量 (列G)
-            ch4_emission = row[7].value      # CH4排放量 (列H)
-            n2o_emission = row[8].value      # N2O排放量 (列I)
-            hfcs_emission = row[9].value     # HFCs排放量 (列J)
-            pfcs_emission = row[10].value    # PFCs排放量 (列K)
-            sf6_emission = row[11].value     # SF6排放量 (列L)
-            nf3_emission = row[12].value     # NF3排放量 (列M)
-
-            # 跳过空行
+            col_b = row[1].value
+            col_c = row[2].value
             if not col_b and not col_c:
                 continue
 
-            # 确定编号和排放源
-            number_str = ''
-            source_str = ''
-
+            number_str = ""
             if col_b:
                 col_b_str = str(col_b).strip()
-                # 检查B列是否是编号格式（如"1.1", "1.1.1"）- 以数字开头
                 if col_b_str and col_b_str[0].isdigit():
                     number_str = col_b_str
-                    source_str = str(col_c).strip() if col_c else ''
-                # B列是类别名称（如"范围一 直接排放"）
                 else:
-                    # 更新当前类别（用于前向填充）
                     current_category = col_b_str
-                    # 跳过类别标题行，但继续处理后续行
                     continue
 
-            facility_str = str(facility).strip() if facility else ''
-            note_str = str(note).strip() if note else ''
-
-            # 跳过标题行
             if not number_str or number_str == '编号':
                 continue
 
-            # 范围一：编号以1开头（如1.1, 1.1.1）
-            if number_str.startswith('1.'):
-                # 确定子类别（根据编号前缀判断）
-                if number_str.startswith('1.1.'):
-                    current_sub_category = '固定源燃烧'
-                elif number_str.startswith('1.2.'):
-                    current_sub_category = '移动源燃烧'
-                elif number_str.startswith('1.3.'):
-                    current_sub_category = '遗散源'
-                elif number_str.startswith('1.4.'):
-                    current_sub_category = '工艺排放'
+            if number_str.startswith('1.') and number_str not in preferred_number_order:
+                preferred_number_order.append(number_str)
 
-                # 使用编号作为主标识，但保留类别信息
-                item = {
-                    'name': current_sub_category or number_str,
-                    'number': number_str,
-                    'category': current_category,
-                    'emission_source': source_str,
-                    'facility': facility_str,
-                    'note': note_str,
-                    'total_green_house_gas_emissions': self.format_emission(total_emission),
-                    'CO2_emissions': self.format_emission(co2_emission),
-                    'CH4_emissions': self.format_emission(ch4_emission),
-                    'N2O_emissions': self.format_emission(n2o_emission),
-                    'HFCs_emissions': self.format_emission(hfcs_emission),
-                    'PFCs_emissions': self.format_emission(pfcs_emission),
-                    'SFs_emissions': self.format_emission(sf6_emission),
-                    'NF3_emissions': self.format_emission(nf3_emission)
-                }
-                scope1_detail_items.append(item)
+        def score_item(item: Dict[str, Any], has_error: bool) -> int:
+            score = 0
+            score += -1000 if has_error else 100
+            if item.get('emission_source'):
+                score += 20
+            if item.get('facility'):
+                score += 10
+            total_val = self.safe_float(item.get('total_green_house_gas_emissions'))
+            if total_val != 0:
+                score += 5
+            gas_keys = ['CO2_emissions', 'CH4_emissions', 'N2O_emissions', 'HFCs_emissions', 'PFCs_emissions', 'SFs_emissions', 'NF3_emissions']
+            if any(self.safe_float(item.get(k)) != 0 for k in gas_keys):
+                score += 3
+            if item.get('category'):
+                score += 1
+            return score
 
-        # 分类范围一数据
-        for item in scope1_detail_items:
-            number = item.get('number', '')
-            if number.startswith('1.1.'):
+        def is_effectively_blank_item(item: Dict[str, Any]) -> bool:
+            if item.get('emission_source') or item.get('facility'):
+                return False
+            keys = ['total_green_house_gas_emissions', 'CO2_emissions', 'CH4_emissions', 'N2O_emissions', 'HFCs_emissions', 'PFCs_emissions', 'SFs_emissions', 'NF3_emissions']
+            return all(self.safe_float(item.get(k)) == 0 for k in keys)
+
+        data_pool: Dict[str, Dict[str, Any]] = {}
+        data_meta: Dict[str, Dict[str, Any]] = {}
+
+        for inventory_sheet in inventory_sheets:
+            print(f"[范围一详细] 正在从 {inventory_sheet.title} 汇总数据...")
+            
+            # 从第14行开始（第12行是标题，第13行是单位）
+            current_category = ""
+
+            for row in inventory_sheet.iter_rows(min_row=14):
+                if len(row) < 13:
+                    continue
+
+                col_b = row[1].value        # 编号或类别名
+                col_c = row[2].value        # 排放源
+                
+                if not col_b and not col_c:
+                    continue
+
+                number_str = ''
+                if col_b:
+                    col_b_str = str(col_b).strip()
+                    if col_b_str and col_b_str[0].isdigit():
+                        number_str = col_b_str
+                    else:
+                        current_category = col_b_str
+                        continue
+
+                if not number_str or number_str == '编号':
+                    continue
+
+                # 提取数据项
+                if number_str.startswith('1.'):
+                    # 确定子类别
+                    sub_cat = ""
+                    if number_str.startswith('1.1.'): sub_cat = '固定源燃烧'
+                    elif number_str.startswith('1.2.'): sub_cat = '移动源燃烧'
+                    elif number_str.startswith('1.3.'): sub_cat = '遗散源'
+                    elif number_str.startswith('1.4.'): sub_cat = '工艺排放'
+
+                    item = {
+                        'name': sub_cat or number_str,
+                        'number': number_str,
+                        'category': current_category,
+                        'emission_source': self.safe_str(col_c),
+                        'facility': self.safe_str(row[3].value),
+                        'note': self.safe_str(row[4].value),
+                        'total_green_house_gas_emissions': self.format_emission(row[5].value),
+                        'CO2_emissions': self.format_emission(row[6].value),
+                        'CH4_emissions': self.format_emission(row[7].value),
+                        'N2O_emissions': self.format_emission(row[8].value),
+                        'HFCs_emissions': self.format_emission(row[9].value),
+                        'PFCs_emissions': self.format_emission(row[10].value),
+                        'SFs_emissions': self.format_emission(row[11].value),
+                        'NF3_emissions': self.format_emission(row[12].value)
+                    }
+
+                    has_error = self.is_error_value(col_c) or self.is_error_value(row[5].value)
+                    new_score = score_item(item, has_error)
+
+                    if number_str not in data_pool:
+                        data_pool[number_str] = item
+                        data_meta[number_str] = {
+                            'score': new_score,
+                            'has_error': has_error,
+                            'sheet_title': inventory_sheet.title,
+                        }
+                    else:
+                        meta = data_meta.get(number_str, {})
+                        old_score = int(meta.get('score', -10**9))
+                        old_title = str(meta.get('sheet_title', ''))
+                        if new_score > old_score or (new_score == old_score and inventory_sheet.title == preferred_title and old_title != preferred_title):
+                            data_pool[number_str] = item
+                            data_meta[number_str] = {
+                                'score': new_score,
+                                'has_error': has_error,
+                                'sheet_title': inventory_sheet.title,
+                            }
+
+        number_order = preferred_number_order if preferred_number_order else sorted(list(data_pool.keys()), key=self.natural_sort_key)
+
+        # 3. 按顺序分配到结果
+        for num in number_order:
+            if num not in data_pool:
+                continue
+            item = data_pool[num]
+            if is_effectively_blank_item(item):
+                continue
+            if num.startswith('1.1.'):
                 result['scope1_stationary_combustion_emissions_items'].append(item)
-            elif number.startswith('1.2.'):
+            elif num.startswith('1.2.'):
                 result['scope1_mobile_combustion_emissions_items'].append(item)
-            elif number.startswith('1.3.'):
+            elif num.startswith('1.3.'):
                 result['scope1_fugitive_emissions_items'].append(item)
-            elif number.startswith('1.4.'):
+            elif num.startswith('1.4.'):
                 result['scope1_process_emissions_items'].append(item)
 
-        print(f"[范围一详细] 提取范围一详细表数据: {len(scope1_detail_items)} 行")
+        print(f"[范围一详细] 提取完成:")
         print(f"  固定源燃烧: {len(result['scope1_stationary_combustion_emissions_items'])} 行")
         print(f"  移动源燃烧: {len(result['scope1_mobile_combustion_emissions_items'])} 行")
         print(f"  逸散源: {len(result['scope1_fugitive_emissions_items'])} 行")

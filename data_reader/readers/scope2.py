@@ -64,133 +64,93 @@ class Scope2Reader(BaseReader):
         table_sheet = self.find_sheet_by_name('表1', '温室气体盘查表')
 
         if table_sheet:
-            # 动态查找总排放量汇总行
+            print(f"[范围二汇总] 正在从 {table_sheet.title} 提取数据...")
+            
+            # 查找所有包含"总排放量"的行
+            summary_rows = []
             for row in table_sheet.iter_rows(values_only=True):
                 a_val = row[0] if len(row) > 0 else None
-                b_val = row[1] if len(row) > 1 else None
-                c_val = row[2] if len(row) > 2 else None
-                d_val = row[3] if len(row) > 3 else None
-                e_val = row[4] if len(row) > 4 else None
+                if a_val and isinstance(a_val, str) and '总排放量' in a_val:
+                    summary_rows.append(row)
+            
+            print(f"[范围二汇总] 找到 {len(summary_rows)} 个总排放量汇总行")
 
-                if a_val and isinstance(a_val, str) and '排放量' in a_val:
-                    if isinstance(b_val, (int, float)) and isinstance(c_val, (int, float)) and isinstance(d_val, (int, float)):
-                        result['scope_1_emissions'] = float(b_val)
-                        result['scope_2_location_based_emissions'] = float(c_val)
-                        result['scope_3_emissions'] = float(d_val)
-                        result['scope_2_location'] = float(c_val)
-                        if isinstance(e_val, (int, float)):
-                            result['total_emission_location'] = float(e_val)
-                    break
+            # 通常第一行是基于位置，第二行是基于市场
+            if len(summary_rows) >= 1:
+                loc_row = summary_rows[0]
+                # Column B=Scope 1, C=Scope 2 Loc, D=Scope 3, E=Total Loc
+                result['scope_1_emissions'] = self.safe_float(loc_row[1])
+                result['scope_2_location_based_emissions'] = self.safe_float(loc_row[2])
+                result['scope_3_emissions'] = self.safe_float(loc_row[3])
+                result['scope_2_location'] = result['scope_2_location_based_emissions']
+                result['total_emission_location'] = self.safe_float(loc_row[4])
+                print(f"  [位置法] Scope1: {result['scope_1_emissions']}, Scope2: {result['scope_2_location']}, Scope3: {result['scope_3_emissions']}")
 
-            # 动态查找范围二基于市场的排放量
-            for row in table_sheet.iter_rows():
-                e_val = row[4].value if len(row) > 4 else None
-                c_val = row[2].value if len(row) > 2 else None
-                if e_val and isinstance(e_val, str) and '基于市场' in e_val:
-                    if c_val and isinstance(c_val, (int, float)):
-                        result['scope_2_market_based_emissions'] = float(c_val)
-                        result['scope_2_market'] = float(c_val)
-                        print(f"[范围二] 找到基于市场排放量: {float(c_val)}")
-                    break
-
-            # 计算总排放量（基于市场）
-            result['total_emission_market'] = (
-                result.get('scope_1_emissions', 0) +
-                result.get('scope_2_market_based_emissions', 0) +
-                result.get('scope_3_emissions', 0)
-            )
+            if len(summary_rows) >= 2:
+                mar_row = summary_rows[1]
+                # Column B=Scope 1, C=Scope 2 Mkt, D=Scope 3, E=Total Mkt
+                result['scope_2_market_based_emissions'] = self.safe_float(mar_row[2])
+                result['scope_2_market'] = result['scope_2_market_based_emissions']
+                result['total_emission_market'] = self.safe_float(mar_row[4])
+                print(f"  [市场法] Scope2: {result['scope_2_market']}, Total: {result['total_emission_market']}")
+            else:
+                # 如果没有第二行，尝试计算
+                scope_1 = result.get('scope_1_emissions') or 0
+                scope_2_mkt = result.get('scope_2_market_based_emissions') or 0
+                scope_3 = result.get('scope_3_emissions') or 0
+                result['total_emission_market'] = scope_1 + scope_2_mkt + scope_3
 
         return result
 
     def _extract_scope2_items(self) -> Dict[str, Any]:
         """
-        从温室气体盘查表中提取范围二输入能源的间接排放清册数据
-
-        Returns:
-            包含范围二排放明细的字典
+        从温室气体盘查清册中提取范围二详细数据
         """
         result = {'scope2_items': []}
 
-        # 查找温室气体盘查表
-        pandata_sheet = self.find_sheet_by_name('盘查表')
+        # 查找温室气体盘查清册表
+        inventory_sheet = self.find_sheet_by_name('盘查清册', '清册')
 
-        if pandata_sheet:
-            print(f"[范围二] 找到温室气体盘查表: {pandata_sheet.title}")
-            scope2_items = []
+        if not inventory_sheet:
+            print("[范围二详细] 未找到温室气体盘查清册表")
+            return result
 
-            # 查找包含"汇总"和"外购电力"的行
-            location_total = None
-            market_total = None
+        print(f"[范围二详细] 找到温室气体盘查清册表: {inventory_sheet.title}")
+        scope2_items = []
 
-            # 尝试匹配包含"汇总"或"Total"的行
-            total_keywords = ['汇总', '总计', 'Total', 'TOTAL']
+        # 遍历所有行，查找编号以 "2." 开头的行
+        for row in inventory_sheet.iter_rows(min_row=14):
+            if len(row) < 13:
+                continue
 
-            for row_idx, row in enumerate(pandata_sheet.iter_rows(min_row=1, values_only=True), start=1):
-                first_col = str(row[0]).strip() if row[0] else ''
-                second_col = str(row[1]).strip() if len(row) > 1 else ''
-                fourth_col = str(row[4]).strip() if len(row) > 4 else ''
+            # Excel结构：A=空, B=编号/类别名, C=排放源, D=排放设施, E=备注, F=总排放量, G=CO2, H=CH4, I=N2O, J=HFCs, K=PFCs, L=SF6, M=NF3
+            col_b = row[1].value        # 编号或类别名
+            if not col_b:
+                continue
+                
+            col_b_str = str(col_b).strip()
+            
+            # 检查是否是以 "2." 开头的编号（范围二数据）
+            if col_b_str.startswith('2.'):
+                item = {
+                    'number': col_b_str,
+                    'emission_source': self.safe_str(row[2].value),
+                    'facility': self.safe_str(row[3].value),
+                    'note': self.safe_str(row[4].value),
+                    'total_green_house_gas_emissions': self.safe_float(row[5].value),
+                    'CO2_emissions': self.safe_float(row[6].value),
+                    'CH4_emissions': self.safe_float(row[7].value),
+                    'N2O_emissions': self.safe_float(row[8].value),
+                    'HFCs_emissions': self.safe_float(row[9].value),
+                    'PFCs_emissions': self.safe_float(row[10].value),
+                    'SFs_emissions': self.safe_float(row[11].value),
+                    'SF6_emissions': self.safe_float(row[11].value),
+                    'NF3_emissions': self.safe_float(row[12].value),
+                }
+                scope2_items.append(item)
 
-                # 检查是否是汇总行
-                is_total_row = any(keyword in first_col or first_col == keyword for keyword in total_keywords)
-                has_electricity = '外购' in second_col or '电力' in second_col
-
-                if is_total_row and has_electricity:
-                    # 检查第四列来判断是基于位置还是基于市场
-                    is_location = '位置' in fourth_col or 'Location' in fourth_col or 'location' in fourth_col
-                    is_market = '市场' in fourth_col or 'Market' in fourth_col or 'market' in fourth_col
-
-                    if is_location:
-                        location_total = row
-                        print(f"  找到外购电力（基于位置）汇总: Row {row_idx}")
-                    elif is_market:
-                        market_total = row
-                        print(f"  找到外购电力（基于市场）汇总: Row {row_idx}")
-
-            # 构建两行数据
-            if location_total:
-                total = self.safe_float(location_total[2]) if len(location_total) > 2 else 0
-                co2 = self.safe_float(location_total[3]) if len(location_total) > 3 else total
-
-                total_formatted = f"{total:,.2f}" if total > 0 else "0.00"
-                co2_formatted = f"{co2:,.2f}" if co2 > 0 else "0.00"
-
-                scope2_items.append({
-                    'number': '2.1',
-                    'emission_source': '外购电力（基于位置）',
-                    'total_green_house_gas_emissions': total_formatted,
-                    'CO2_emissions': co2_formatted,
-                    'CH4_emissions': '0.00',
-                    'N2O_emissions': '0.00',
-                    'HFCs_emissions': '0.00',
-                    'PFCs_emissions': '0.00',
-                    'SFs_emissions': '0.00',
-                    'NF3_emissions': '0.00'
-                })
-                print(f"  提取2.1 外购电力（基于位置）: {total_formatted} tCO2e")
-
-            if market_total:
-                total = self.safe_float(market_total[2]) if len(market_total) > 2 else 0
-                co2 = self.safe_float(market_total[3]) if len(market_total) > 3 else total
-
-                total_formatted = f"{total:,.2f}" if total > 0 else "0.00"
-                co2_formatted = f"{co2:,.2f}" if co2 > 0 else "0.00"
-
-                scope2_items.append({
-                    'number': '2.2',
-                    'emission_source': '外购电力（基于市场）',
-                    'total_green_house_gas_emissions': total_formatted,
-                    'CO2_emissions': co2_formatted,
-                    'CH4_emissions': '0.00',
-                    'N2O_emissions': '0.00',
-                    'HFCs_emissions': '0.00',
-                    'PFCs_emissions': '0.00',
-                    'SFs_emissions': '0.00',
-                    'NF3_emissions': '0.00'
-                })
-                print(f"  提取2.2 外购电力（基于市场）: {total_formatted} tCO2e")
-
-            result['scope2_items'] = scope2_items
-            print(f"[范围二] 提取到范围二排放明细: {len(scope2_items)} 行")
+        result['scope2_items'] = scope2_items
+        print(f"[范围二详细] 提取到范围二排放明细: {len(scope2_items)} 行")
 
         return result
 

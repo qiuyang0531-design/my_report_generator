@@ -360,12 +360,21 @@ class ExcelDataReaderRefactored(BaseReader):
                     mapped_item[f'ncv_{cat_prefix}'] = item.get('ncv', '')
                     mapped_item[f'emission_unit_{cat_prefix}'] = item.get('unit', '')
                     mapped_item[f'emission_oa_{cat_prefix}'] = item.get('ox_rate', '')
-                    mapped_item[f'CO2_emission_cv_factor'] = item.get('CO2_emission_cv_factor', '')
-                    mapped_item[f'CH4_emission_cv_factor'] = item.get('CH4_emission_cv_factor', '')
-                    mapped_item[f'N2O_emission_cv_factor'] = item.get('N2O_emission_cv_factor', '')
-                    mapped_item[f'CO2_emission_factor'] = item.get('CO2_emission_factor', '')
-                    mapped_item[f'CH4_emission_factor'] = item.get('CH4_emission_factor', '')
-                    mapped_item[f'N2O_emission_factor'] = item.get('N2O_emission_factor', '')
+                    # 模板中这些字段可能没有后缀 (Table 36 验证)
+                    mapped_item['CO2_emission_cv_factor'] = item.get('CO2_emission_cv_factor', '')
+                    mapped_item['CH4_emission_cv_factor'] = item.get('CH4_emission_cv_factor', '')
+                    mapped_item['N2O_emission_cv_factor'] = item.get('N2O_emission_cv_factor', '')
+                    mapped_item['CO2_emission_factor'] = item.get('CO2_emission_factor', '')
+                    mapped_item['CH4_emission_factor'] = item.get('CH4_emission_factor', '')
+                    mapped_item['N2O_emission_factor'] = item.get('N2O_emission_factor', '')
+                    
+                    # 同时保留带后缀的版本，以防万一
+                    mapped_item[f'CO2_emission_cv_factor_{cat_prefix}'] = item.get('CO2_emission_cv_factor', '')
+                    mapped_item[f'CH4_emission_cv_factor_{cat_prefix}'] = item.get('CH4_emission_cv_factor', '')
+                    mapped_item[f'N2O_emission_cv_factor_{cat_prefix}'] = item.get('N2O_emission_cv_factor', '')
+                    mapped_item[f'CO2_emission_factor_{cat_prefix}'] = item.get('CO2_emission_factor', '')
+                    mapped_item[f'CH4_emission_factor_{cat_prefix}'] = item.get('CH4_emission_factor', '')
+                    mapped_item[f'N2O_emission_factor_{cat_prefix}'] = item.get('N2O_emission_factor', '')
 
                 cat_ef_items.append(mapped_item)
 

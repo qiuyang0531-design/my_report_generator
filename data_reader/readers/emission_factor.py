@@ -235,6 +235,18 @@ class EmissionFactorReader(BaseReader):
             if not any(cell.value is not None for cell in row):
                 continue
 
+            # 检查第一列(编号)是否是数字，或者包含特定的前缀。如果不是，可能是标题或备注，跳过。
+            # 这可以防止"类别11"这种标题被当作数据行提取到"类别9"中。
+            number_val = row[1].value # 编号在第二列
+            if number_val:
+                number_str = str(number_val).strip()
+                # 如果是"类别X"格式，跳过
+                if number_str.startswith('类别') or '范围' in number_str:
+                    continue
+                # 如果不是以数字开头，且不是空，也可能是标题，跳过
+                if number_str and not number_str[0].isdigit():
+                    continue
+
             # 根据子表类型提取数据
             if subtable_type == 'combustion':
                 item = self._extract_combustion_row(row)

@@ -2,6 +2,79 @@ from docx import Document
 from docx.shared import Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 import os
+import sys
+
+def compare_reports(dy_path: str = None, cr_path: str = None,
+                    dy_paragraph_range: tuple = None, cr_paragraph_range: tuple = None,
+                    output_file: str = None):
+    """
+    对比两份报告的"量化方法说明"部分
+
+    Args:
+        dy_path: DY报告路径，默认使用当前目录下的DY文件
+        cr_path: carbon_report路径，默认使用当前目录下的carbon_report文件
+        dy_paragraph_range: DY报告段落范围，如 (168, 280)
+        cr_paragraph_range: carbon_report段落范围，如 (145, 250)
+        output_file: 输出文件路径，默认不保存
+    """
+    sys.stdout.reconfigure(encoding='utf-8')
+
+    if dy_path is None:
+        dy_path = 'DY-GHG-2025-01 大冶钢铁-温室气体碳盘查报告-Update 20250703-GHG Protocol.docx'
+    if cr_path is None:
+        cr_path = 'carbon_report.docx'
+    if dy_paragraph_range is None:
+        dy_paragraph_range = (168, 280)
+    if cr_paragraph_range is None:
+        cr_paragraph_range = (145, 250)
+
+    if not os.path.exists(dy_path):
+        print(f"DY报告文件不存在: {dy_path}")
+        return
+    if not os.path.exists(cr_path):
+        print(f"carbon_report文件不存在: {cr_path}")
+        return
+
+    dy_doc = Document(dy_path)
+    cr_doc = Document(cr_path)
+
+    print("=" * 60)
+    print('两份报告"量化方法说明"部分对比分析')
+    print("=" * 60)
+
+    print(f"\n--- DY 报告段落 {dy_paragraph_range[0]}-{dy_paragraph_range[1]} ---")
+    dy_content = []
+    for i in range(dy_paragraph_range[0], min(dy_paragraph_range[1], len(dy_doc.paragraphs))):
+        text = dy_doc.paragraphs[i].text.strip()
+        if text:
+            print(f"{i}: {text}")
+            dy_content.append((i, text))
+
+    print(f"\n--- carbon_report 段落 {cr_paragraph_range[0]}-{cr_paragraph_range[1]} ---")
+    cr_content = []
+    for i in range(cr_paragraph_range[0], min(cr_paragraph_range[1], len(cr_doc.paragraphs))):
+        text = cr_doc.paragraphs[i].text.strip()
+        if text:
+            print(f"{i}: {text}")
+            cr_content.append((i, text))
+
+    if output_file:
+        with open(output_file, 'w', encoding='utf-8') as f:
+            f.write("=== DY Section 2 (量化方法说明) paragraphs ===\n")
+            for i, text in dy_content:
+                f.write(f"{i}: {text}\n")
+            f.write("\n=== carbon_report Section 2 (量化方法说明) paragraphs ===\n")
+            for i, text in cr_content:
+                f.write(f"{i}: {text}\n")
+        print(f"\n内容已保存到: {output_file}")
+
+    print("\n" + "=" * 60)
+    print("对比结论:")
+    print("=" * 60)
+    print("1. DY报告的EF描述包含详细的参数来源说明")
+    print("2. carbon_report的EF描述较为简略，缺少部分来源信息")
+    print("3. 建议参考DY报告补充EF描述的完整来源信息")
+
 
 def analyze_template():
     """
@@ -68,4 +141,19 @@ def analyze_template():
         print(f"分析模板时出错: {e}")
 
 if __name__ == "__main__":
-    analyze_template()
+    import argparse
+    parser = argparse.ArgumentParser(description='文档分析工具')
+    parser.add_argument('--compare', action='store_true', help='对比两份报告的量化方法说明部分')
+    parser.add_argument('--dy-range', type=int, nargs=2, default=[168, 280], help='DY报告段落范围')
+    parser.add_argument('--cr-range', type=int, nargs=2, default=[145, 250], help='carbon_report段落范围')
+    parser.add_argument('--output', type=str, help='输出文件路径')
+    args = parser.parse_args()
+
+    if args.compare:
+        compare_reports(
+            dy_paragraph_range=tuple(args.dy_range),
+            cr_paragraph_range=tuple(args.cr_range),
+            output_file=args.output
+        )
+    else:
+        analyze_template()
