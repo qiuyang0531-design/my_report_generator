@@ -28,6 +28,7 @@ Thumbs.db
 # Excel files (except the test_data.xlsx example)
 *.xlsx
 !test_data.xlsx
+!DY-GHG-2026-01 大冶特殊钢-温室气体盘查清册-Update 20260317Protocol-tr-0408.xlsx
 
 # Test output
 test_report.docx
