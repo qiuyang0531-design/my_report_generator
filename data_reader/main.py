@@ -178,6 +178,7 @@ class ExcelDataReaderRefactored(BaseReader):
                 mapped_item['emission_source_type_dir'] = item.get('category', '')
                 mapped_item['emission_source_dir'] = item.get('emission_source', '')
                 mapped_item['emission_facilities_dir'] = item.get('facility', '')
+                mapped_item['emission_unit_dir'] = item.get('unit', '')
                 process_items.append(mapped_item)
 
             elif '逸散排放' in category:

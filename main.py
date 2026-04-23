@@ -604,7 +604,10 @@ def prepare_context_with_formatting(context):
                         except (ValueError, TypeError):
                             formatted_item[k] = str(v) if v is not None else ""
                     elif isinstance(v, (int, float)):
-                        formatted_item[k] = format_number(v)
+                        if k.endswith('_emission_factor'):
+                            formatted_item[k] = format_number(v, decimals=5, with_comma=False)
+                        else:
+                            formatted_item[k] = format_number(v)
                 formatted_items.append(formatted_item)
             formatted_context[var_name] = formatted_items
             print(f"[范围三排放因子] 已格式化 {var_name}: {len(formatted_items)} 行数据")

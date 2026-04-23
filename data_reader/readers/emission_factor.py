@@ -276,13 +276,30 @@ class EmissionFactorReader(BaseReader):
     def _extract_combustion_row(self, row) -> Dict[str, Any]:
         """提取燃烧排放因子行数据"""
         try:
+            def looks_like_energy_unit(value) -> bool:
+                s = str(value).strip() if value is not None else ''
+                if not s:
+                    return False
+                s_compact = s.lower().replace(' ', '')
+                if '/' not in s_compact:
+                    return False
+                return any(k in s_compact for k in ['gj', 'mj', 'kwh', 'nm3', 'm3', 't', 'kg'])
+
+            unit = self.safe_get_cell(row, 6)
+            if not str(unit).strip():
+                for col_idx in [5, 7, 8, 4, 9, 10]:
+                    candidate = self.safe_get_cell(row, col_idx)
+                    if looks_like_energy_unit(candidate):
+                        unit = candidate
+                        break
+
             return {
                 'number': self.safe_get_cell(row, 1),
                 'category': self.safe_get_cell(row, 2),
                 'emission_source': self.safe_get_cell(row, 3),
                 'facility': self.safe_get_cell(row, 4),
                 'ncv': self.safe_float(self.safe_get_cell(row, 5)),
-                'unit': self.safe_get_cell(row, 6),
+                'unit': unit,
                 'ox_rate': self.safe_float(self.safe_get_cell(row, 7)),
                 'CO2_emission_cv_factor': self.safe_float(self.safe_get_cell(row, 8)),
                 'CH4_emission_cv_factor': self.safe_float(self.safe_get_cell(row, 9)),
@@ -297,13 +314,28 @@ class EmissionFactorReader(BaseReader):
     def _extract_process_row(self, row) -> Dict[str, Any]:
         """提取制程排放因子行数据"""
         try:
+            def looks_like_emission_unit(value) -> bool:
+                s = str(value).strip() if value is not None else ''
+                if not s:
+                    return False
+                s_compact = s.lower().replace(' ', '')
+                return ('co2' in s_compact) and ('/' in s_compact)
+
+            unit = self.safe_get_cell(row, 6)
+            if not str(unit).strip():
+                for col_idx in [5, 7, 8, 4, 9, 10]:
+                    candidate = self.safe_get_cell(row, col_idx)
+                    if looks_like_emission_unit(candidate):
+                        unit = candidate
+                        break
+
             return {
                 'number': self.safe_get_cell(row, 1),
                 'category': self.safe_get_cell(row, 2),
                 'emission_source': self.safe_get_cell(row, 3),
                 'facility': self.safe_get_cell(row, 4),
                 'ncv': 0,
-                'unit': self.safe_get_cell(row, 6),
+                'unit': unit,
                 'ox_rate': 0,
                 'CO2_emission_cv_factor': 0,
                 'CH4_emission_cv_factor': 0,
@@ -359,13 +391,28 @@ class EmissionFactorReader(BaseReader):
     def _extract_scope2_row(self, row) -> Dict[str, Any]:
         """提取外购能源排放因子行数据"""
         try:
+            def looks_like_emission_unit(value) -> bool:
+                s = str(value).strip() if value is not None else ''
+                if not s:
+                    return False
+                s_compact = s.lower().replace(' ', '')
+                return ('co2' in s_compact) and ('/' in s_compact)
+
+            unit = self.safe_get_cell(row, 6)
+            if not str(unit).strip():
+                for col_idx in [5, 7, 8, 4, 9, 10]:
+                    candidate = self.safe_get_cell(row, col_idx)
+                    if looks_like_emission_unit(candidate):
+                        unit = candidate
+                        break
+
             return {
                 'number': self.safe_get_cell(row, 1),
                 'category': self.safe_get_cell(row, 2),
                 'emission_source': self.safe_get_cell(row, 3),
                 'facility': self.safe_get_cell(row, 4),
                 'ncv': 0,
-                'unit': self.safe_get_cell(row, 6),
+                'unit': unit,
                 'ox_rate': 0,
                 'CO2_emission_cv_factor': 0,
                 'CH4_emission_cv_factor': 0,
@@ -381,6 +428,69 @@ class EmissionFactorReader(BaseReader):
     def _extract_scope3_row(self, row, subtable_type: str) -> Dict[str, Any]:
         """提取范围三排放因子行数据"""
         try:
+            def looks_like_unit(value) -> bool:
+                s = str(value).strip() if value is not None else ''
+                if not s:
+                    return False
+                s_lower = s.lower()
+                s_compact = s_lower.replace(' ', '')
+                if any(k in s_lower for k in ['supplychain', 'ecoinvent', 'ipcc', 'cpcd']):
+                    return False
+                return (
+                    (('co2e' in s_compact) or ('co2' in s_compact))
+                    and (
+                        'purchaser price' in s_lower
+                        or 'usd' in s_lower
+                        or '/202' in s_lower
+                        or 'tco2e/' in s_compact
+                        or 'kgco2e/' in s_compact
+                        or 'tco2/' in s_compact
+                        or 'kgco2/' in s_compact
+                        or ('/' in s_compact)
+                    )
+                )
+
+            def looks_like_reference(value) -> bool:
+                s = str(value).strip() if value is not None else ''
+                if not s:
+                    return False
+                if '\n' in s or '\r' in s:
+                    return False
+                if len(s) > 160:
+                    return False
+                if any(k in s for k in ['理由', '原因', '选用', '不用', '估计包含', '更具代表性']):
+                    return False
+                s_lower = s.lower()
+                return any(
+                    k in s_lower
+                    for k in [
+                        'supplychain',
+                        'supplychainghgemissionfactors',
+                        'ecoinvent',
+                        'ipcc',
+                        'cpcd',
+                        'ghg protocol',
+                        'naics',
+                        'ar6',
+                        'ar5',
+                    ]
+                )
+
+            def extract_ecoinvent_reference(value) -> str:
+                s = str(value).strip() if value is not None else ''
+                if not s:
+                    return ''
+                m = re.search(r'(ecoinvent\s*3\.\d+\s*-\s*cut\s*-?\s*off)', s, flags=re.IGNORECASE)
+                if m:
+                    ref = m.group(1)
+                    ref = re.sub(r'\s+', ' ', ref).strip()
+                    ref = re.sub(r'\s*-\s*', '-', ref)
+                    ref = ref.replace('cut-off', 'cut off')
+                    return ref
+                if 'ecoinvent' in s.lower():
+                    return 'ecoinvent 3.10-cut off'
+                return ''
+
             number = self.safe_get_cell(row, 1)
             raw_category = self.safe_get_cell(row, 2)
             emission_source = self.safe_get_cell(row, 3)
@@ -416,19 +526,130 @@ class EmissionFactorReader(BaseReader):
                 has_geography = False
 
             if not has_geography:
-                ef_value = self.safe_float(self.safe_get_cell(row, 5))
-                unit = self.safe_get_cell(row, 6)
-                emission_source_reference = self.safe_get_cell(row, 7)
+                cells = {i: self.safe_get_cell(row, i) for i in range(5, 11)}
+
+                ef_value = 0.0
+                ef_idx = None
+                for idx in [5, 6, 7]:
+                    try:
+                        v = cells[idx]
+                        if isinstance(v, str) and v.strip().startswith('='):
+                            continue
+                        num = float(v)
+                        if num != 0:
+                            ef_value = num
+                            ef_idx = idx
+                            break
+                    except (ValueError, TypeError):
+                        continue
+
+                unit = ''
+                emission_source_reference = ''
+                for idx in range(5, 11):
+                    v = cells[idx]
+                    if isinstance(v, (int, float)):
+                        continue
+                    if not unit and looks_like_unit(v):
+                        unit = v
+                    if not emission_source_reference and looks_like_reference(v):
+                        emission_source_reference = v
+
+                if ef_idx is not None:
+                    if not unit:
+                        candidate = cells.get(ef_idx + 1)
+                        candidate_str = str(candidate).strip() if candidate is not None else ''
+                        if candidate_str and not looks_like_reference(candidate) and not isinstance(candidate, (int, float)):
+                            unit = candidate
+                    if not emission_source_reference:
+                        candidate = cells.get(ef_idx + 2)
+                        candidate_str = str(candidate).strip() if candidate is not None else ''
+                        if candidate_str and not looks_like_unit(candidate) and not isinstance(candidate, (int, float)):
+                            emission_source_reference = candidate
+
+                if not unit:
+                    for idx in range(5, 11):
+                        v = cells[idx]
+                        if isinstance(v, str) and 'co2e' in v.lower():
+                            unit = v
+                            break
+
+                if not emission_source_reference:
+                    for idx in range(10, 4, -1):
+                        v = cells[idx]
+                        if isinstance(v, str) and v.strip() and looks_like_reference(v):
+                            emission_source_reference = v
+                            break
+                if not emission_source_reference:
+                    for idx in range(5, 11):
+                        v = cells[idx]
+                        if isinstance(v, str) and 'ecoinvent' in v.lower():
+                            emission_source_reference = extract_ecoinvent_reference(v)
+                            if emission_source_reference:
+                                break
+
                 geography = ''
             else:
                 geography = self.safe_get_cell(row, 5)
-                col7_value = self.safe_get_cell(row, 6)
-                try:
-                    ef_value = float(col7_value)
-                except:
-                    ef_value = 0
-                unit = self.safe_get_cell(row, 7)
-                emission_source_reference = self.safe_get_cell(row, 8)
+                cells = {i: self.safe_get_cell(row, i) for i in range(6, 12)}
+
+                ef_value = 0.0
+                ef_idx = None
+                for idx in [6, 7, 8]:
+                    try:
+                        v = cells[idx]
+                        if isinstance(v, str) and v.strip().startswith('='):
+                            continue
+                        num = float(v)
+                        if num != 0:
+                            ef_value = num
+                            ef_idx = idx
+                            break
+                    except (ValueError, TypeError):
+                        continue
+
+                unit = ''
+                emission_source_reference = ''
+                for idx in range(6, 12):
+                    v = cells[idx]
+                    if isinstance(v, (int, float)):
+                        continue
+                    if not unit and looks_like_unit(v):
+                        unit = v
+                    if not emission_source_reference and looks_like_reference(v):
+                        emission_source_reference = v
+
+                if ef_idx is not None:
+                    if not unit:
+                        candidate = cells.get(ef_idx + 1)
+                        candidate_str = str(candidate).strip() if candidate is not None else ''
+                        if candidate_str and not looks_like_reference(candidate) and not isinstance(candidate, (int, float)):
+                            unit = candidate
+                    if not emission_source_reference:
+                        candidate = cells.get(ef_idx + 2)
+                        candidate_str = str(candidate).strip() if candidate is not None else ''
+                        if candidate_str and not looks_like_unit(candidate) and not isinstance(candidate, (int, float)):
+                            emission_source_reference = candidate
+
+                if not unit:
+                    for idx in range(6, 12):
+                        v = cells[idx]
+                        if isinstance(v, str) and 'co2e' in v.lower():
+                            unit = v
+                            break
+
+                if not emission_source_reference:
+                    for idx in range(11, 5, -1):
+                        v = cells[idx]
+                        if isinstance(v, str) and v.strip() and looks_like_reference(v):
+                            emission_source_reference = v
+                            break
+                if not emission_source_reference:
+                    for idx in range(6, 12):
+                        v = cells[idx]
+                        if isinstance(v, str) and 'ecoinvent' in v.lower():
+                            emission_source_reference = extract_ecoinvent_reference(v)
+                            if emission_source_reference:
+                                break
 
             return {
                 'number': number,

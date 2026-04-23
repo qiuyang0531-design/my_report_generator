@@ -113,7 +113,20 @@ class BaseReader:
         try:
             if col_idx < len(row):
                 cell = row[col_idx]
-                return cell.value if cell.value is not None else ''
+                if cell.value is not None:
+                    return cell.value
+                try:
+                    ws = getattr(cell, 'parent', None)
+                    coord = getattr(cell, 'coordinate', None)
+                    merged_ranges = getattr(getattr(ws, 'merged_cells', None), 'ranges', None)
+                    if ws is not None and coord and merged_ranges:
+                        for merged_range in merged_ranges:
+                            if coord in merged_range:
+                                top_left = ws.cell(merged_range.min_row, merged_range.min_col)
+                                return top_left.value if top_left.value is not None else ''
+                except Exception:
+                    pass
+                return ''
             return ''
         except:
             return ''
