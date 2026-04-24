@@ -3125,9 +3125,9 @@ if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == '--generate':
         # 生成报告模式
         xlsx_path = sys.argv[2] if len(sys.argv) > 2 else DEFAULT_DY_XLSX_NAME
-        output_path = sys.argv[3] if len(sys.argv) > 3 else "carbon_report.docx"
+        output_path = sys.argv[3] if len(sys.argv) > 3 else "carbon_report_v15.docx"
         generate_report_from_xlsx(xlsx_path=xlsx_path, output_path=output_path)
     else:
         # 默认执行生成报告
         print("使用 'python main.py --generate' 生成报告")
-        generate_report_from_xlsx()
+        generate_report_from_xlsx(output_path="carbon_report_v15.docx")

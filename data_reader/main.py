@@ -148,6 +148,145 @@ class ExcelDataReaderRefactored(BaseReader):
         # ========== 后处理：更新 Flags 标记 ==========
         result = self._update_flags(result)
 
+        # ================= V18 最终整合版：含高压开关与耗氧池修正 ================= 
+        
+        def get_clean_desc(text): 
+            if not text: return "" 
+            import re 
+            # 压缩多余空格并清理换行，确保 Word 缩进正常 
+            return re.sub(r'\s+', ' ', str(text).strip().replace('\n', '').replace('\r', '')) 
+
+        # 1. 基础映射与变量准备 
+        all_table1 = result.get('scope1_items', []) + result.get('scope2_3_items', []) 
+        source_map = {i.get('emission_source'): i.get('data_source') for i in all_table1 if i.get('emission_source')} 
+        
+        ef_items = result.get('pro_ef_items', []) 
+        ef_ref_map = {i.get('emission_source'): i.get('emission_source_reference') for i in ef_items if i.get('emission_source')} 
+        
+        company = result.get('company_name', '大冶特殊钢有限公司') 
+        period = result.get('reporting_period', '2025年度') 
+        gwp_ref = result.get('GWP_Value_Reference_Document') or "《2021年IPCC第六次评估报告AR6》" 
+
+        # 2. 固体燃料识别函数 
+        def is_solid(name): 
+            n = str(name) 
+            return any(s in n for s in ['煤', '焦', '炭', '丁', '屑']) and \
+                   not any(e in n for e in ['煤气', '油', '生产', '外售']) 
+
+        # 预扫描固体燃料名单 
+        active_solids = [n for n in source_map.keys() if is_solid(n)] 
+        fuel_list_str = "、".join(sorted(list(set([n.replace('燃烧','').strip() for n in active_solids])))) 
+        solid_ds = "、".join(list(dict.fromkeys([source_map[n] for n in active_solids if source_map[n]]))) 
+
+        for scope in ['scope_1', 'scope_2', 'scope_3']: 
+            methods = result.get('quantification_methods', {}).get(scope, {}) 
+            for m_key, m_info in methods.items(): 
+                # 强制名称替换：厌氧池 -> 耗氧池 
+                m_name = m_info.get('name', '').replace('厌氧池', '耗氧池') 
+                m_info['name'] = m_name 
+                
+                fuel_clean = m_name.replace('燃烧','').replace('外售','').replace('排放','').strip() 
+
+                # 动态获取当前项的 EF 引用源 
+                ref_key = next((k for k in ef_ref_map.keys() if k == m_name), 
+                              next((k for k in ef_ref_map.keys() if k in m_name or m_name in k), None)) 
+                curr_ef_ref = ef_ref_map.get(ref_key) or "相关核算指南" 
+
+                # 动态获取 H 列来源 
+                s_key = next((k for k in source_map.keys() if k in m_name or m_name in k), None) 
+                ds = source_map.get(s_key, "相关报表") 
+
+                # ===================================================================== 
+                # 专项分支拦截 
+                # ===================================================================== 
+
+                # 1. 高压开关 (SF6 逸散) - 新增逻辑 
+                if any(x in m_name for x in ["高压开关", "SF6"]): 
+                    m_info['ad'] = get_clean_desc(f"来源于{company}提供{ds}{fuel_clean}填充SF6铭牌额定量的统计。") 
+                    m_info['ef'] = get_clean_desc(f"参考GB/T8905-2008 六氟化硫电气设备中气体管理和检测导则9.3，逸散率取值0.5%。") 
+
+                # 2. 废水处理 - 化粪池 (BOD类) 
+                elif "化粪池" in m_name: 
+                    m_info['ad'] = get_clean_desc(f"来源于{company}提供{ds}{period}员工出勤总工时推算BOD排放量的统计。") 
+                    m_info['ef'] = get_clean_desc( 
+                        f"EF=Bo*MCF=0.18（kgCH4/kgBOD）；所需的参数包括Bo甲烷产生最大能力、MCF甲烷修正因子和人均BOD产生量，" 
+                        f"分别来源于IPCC《2006 年国家温室气体清单指南》第5卷第6章表6.2、表6.3和表6.4。其中Bo取缺省因子0.6，" 
+                        f"MCF取0.3，因{company}的生活废水工业废水处理同在耗氧处理厂中，管理不完善而保守选取0.3。" 
+                    ) 
+                
+                # 3. 废水处理 - 耗氧池 (COD类) 
+                elif any(x in m_name for x in ["耗氧池", "废水处理"]): 
+                    m_info['ad'] = get_clean_desc(f"来源于{company}提供{ds}{period}生产过程产生的工业废水处理量及进出口COD浓度的统计。") 
+                    m_info['ef'] = get_clean_desc( 
+                        f"EF=Bo*MCF=0.075（kgCH4/kgCOD）；所需的参数包括Bo甲烷产生最大能力、MCF甲烷修正因子，" 
+                        f"分别来源于IPCC《2006 年国家温室气体清单指南》第5卷第6章公式6.1、表6.8。其中Bo取缺省因子0.25，" 
+                        f"MCF取0.3，因{company}的生活废水工业废水处理同在耗氧处理厂中，管理不完善保守选取0.3。" 
+                    ) 
+
+                # 4. 空调/制冷剂 
+                elif any(x in m_name for x in ['空调', '制冷剂', 'R32', '加氟', '逸散']): 
+                    m_info['ad'] = get_clean_desc(f"来源于{company}提供{ds}{period}{fuel_clean}的统计。") 
+                    m_info['ef'] = get_clean_desc(f"所需的参数为设备制冷剂充装量，量化采用质量平衡法，排放因子为 1kgGHG/kg。数据来源于{curr_ef_ref}。") 
+
+                # --- 分支 A：固体燃料 --- 
+                elif is_solid(m_name) or "固体燃料" in m_name: 
+                    if not fuel_list_str: continue 
+                    m_info['name'] = f"固体燃料（{fuel_list_str}燃烧）" 
+                    # 应用新模板：来源于[公司]提供[来源][周期][燃料]的统计 
+                    ad_text = f"来源于{company}提供{solid_ds or '相关报表'}{period}{fuel_list_str}的统计。" 
+                    m_info['ad'] = get_clean_desc(ad_text) 
+                    
+                    m_info['ef'] = get_clean_desc( 
+                        f"所需的参数包括{fuel_list_str}低位发热量、单位热值含碳量、碳氧化率；" 
+                        f"数据来源于{curr_ef_ref} 附表A.1常用化石燃料相关参数缺省值；" 
+                        f"固体燃料燃烧产生CO2、CH4、N2O三类温室气体热值排放系数来源于《IPCC-2006缺省值》，GWP值来源于{gwp_ref}。" 
+                    ) 
+
+                # --- 分支 B：副产品外售 --- 
+                elif "副产品" in m_name or "外售" in m_name: 
+                    active_bp = [k for k in source_map.keys() if "外售" in k] 
+                    fuels = [k.replace('外售','').replace('燃烧','').strip() for k in active_bp if '煤气' in k] 
+                    mats = [k.replace('外售','').strip() for k in active_bp if any(x in k for x in ['苯', '油'])] 
+                    bp_ds = "、".join(list(dict.fromkeys([source_map[k] for k in active_bp if source_map[k]]))) 
+                    bp_names = "、".join(fuels + mats) 
+
+                    if not active_bp: continue 
+                    m_info['name'] = f"副产品外售（{bp_names}）" 
+                    # 应用新模板 
+                    ad_text = f"来源于{company}提供{bp_ds or '相关报表'}{period}{bp_names}的统计。" 
+                    m_info['ad'] = get_clean_desc(ad_text) 
+                    
+                    ef_segs = [] 
+                    if fuels: 
+                        f_ref = next((v for k,v in ef_ref_map.items() if '煤气' in k), curr_ef_ref) 
+                        ef_segs.append(f"{'、'.join(fuels)}量化所需的参数包括低位发热量、碳氧化率；数据来源于{f_ref}附表A.1；" 
+                                       f"{'、'.join(fuels)}燃烧产生CO2、CH4、N2O三类温室气体热值排放系数来源于《IPCC-2006缺省值》") 
+                    if mats: 
+                        m_ref = next((v for k,v in ef_ref_map.items() if any(x in k for x in ['苯', '油'])), curr_ef_ref) 
+                        ef_segs.append(f"{'、'.join(mats)}量化所需的参数为活动数据及对应的单位排放因子，数据来源于{m_ref}") 
+                    
+                    m_info['ef'] = get_clean_desc("；".join(ef_segs) + f"；GWP值来源于{gwp_ref}。") 
+
+                # --- 分支 C：常规项（天然气、汽油等） --- 
+                else: 
+                    # 动态匹配 AD 来源 (H列) 
+                    s_key = next((k for k in source_map.keys() if k in m_name or m_name in k), None) 
+                    ds = source_map.get(s_key, "相关报表") 
+                    
+                    # 应用新模板 
+                    ad_text = f"来源于{company}提供{ds}{period}{fuel_clean}的统计。" 
+                    m_info['ad'] = get_clean_desc(ad_text) 
+                    
+                    if any(f in m_name for f in ['气', '油', '燃']): 
+                        m_info['ef'] = get_clean_desc(f"所需的参数包括{fuel_clean}低位发热量、碳氧化率；数据来源于{curr_ef_ref} 附表A.1常用化石燃料相关参数缺省值；" 
+                                                     f"{fuel_clean}燃烧产生CO2、CH4、N2O三类温室气体热值排放系数来源于《IPCC-2006缺省值》，GWP值来源于{gwp_ref}。") 
+                    elif '电力' in m_name: 
+                        m_info['ef'] = get_clean_desc(f"所需的参数为外购电力二氧化碳排放因子；数据来源于{curr_ef_ref}；GWP值来源于{gwp_ref}。") 
+                    else: 
+                        m_info['ef'] = get_clean_desc(f"所需的参数为该类别排放因子；数据来源于{curr_ef_ref}；GWP值来源于{gwp_ref}。") 
+
+        # =====================================================================
+
         return result
 
     def _post_process_emission_factors(self, result: Dict[str, Any]) -> Dict[str, Any]:
